@@ -4,15 +4,15 @@
 - https://datanodes.to/vj467k0bae3s/7-Days-To-Die.rar
 
 ## Among Us
-- PENDIENTE
+- https://datanodes.to/d7t2u5xm2tk7/Among-Us.rar
 
 ## ARK: Survival Ascended
-- PENDIENTE
+- https://datanodes.to/udgrpkvdfaek/ARK-Survival-Ascended.rar
 
 ## ARK: Survival Evolved
-- PENDIENTE
+- https://datanodes.to/dqrln36hfuux/ARK-Survival-Evolved.rar
 
-## Assassin's Creed 2
+## Assassin's Creed II
 - PENDIENTE
 
 ## Assassin's Creed Mirage
@@ -29,6 +29,9 @@
 
 ## Assassin's Creed IV Black Flag
 - PENDIENTE
+
+## Assassin's Creed Black Flag Resynced
+- https://filekeeper.net/aerktgajd6ev/Assassins-Creed-Black-Flag-Resynced.rar
 
 ## Assassin's Creed Odyssey
 - PENDIENTE

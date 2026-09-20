@@ -4,25 +4,37 @@ const sidebar = document.getElementById('sidebar');
 const toggleSidebarBtn = document.getElementById('toggleSidebar');
 const toastStack = document.getElementById('toastStack');
 const searchInput = document.querySelector('.search-shell input');
-const apiBridges = [
-  (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  (url) => `https://api.cors.lol/?url=${encodeURIComponent(url)}`,
-  (url) => `https://proxy.corsfix.com/?${url}`,
-];
+// Agrega tu clave real de RAWG aquí antes de usar la API en producción.
+// Puedes conseguir una gratuita en https://rawg.io/apidocs
+const RAWG_CREDENTIALS = {
+  apiKey: 'c8b54807a02248b1802a5383fd713919',
+};
 
-const fetchRemoteJson = async (url) => {
-  for (const createBridgeUrl of apiBridges) {
-    try {
-      const response = await fetch(createBridgeUrl(url), { cache: 'no-store' });
-      if (!response.ok) continue;
-      const payload = JSON.parse(await response.text());
-      if (payload && typeof payload === 'object') return payload;
-    } catch (error) {
-      console.info('Puente API no disponible:', error.message);
-    }
+const API_CONFIG = {
+  provider: 'rawg',
+  baseUrl: 'http://127.0.0.1:3000/api',
+  apiKey: RAWG_CREDENTIALS.apiKey,
+  useFallback: true,
+};
+
+const LOCAL_LINKS_MARKDOWN = '';
+const PUBLIC_API_BASE_URL = API_CONFIG.baseUrl;
+
+const fetchRawgGames = async () => {
+  const apiKey = (RAWG_CREDENTIALS.apiKey || '').trim();
+  if (!apiKey || apiKey === 'TU_RAWG_API_KEY') {
+    throw new Error('Falta la API key de RAWG');
   }
 
-  throw new Error('No hay una API pública disponible en este momento');
+  const rawgUrl = `https://api.rawg.io/api/games?key=${encodeURIComponent(apiKey)}&page_size=20&ordering=-released`;
+  const response = await fetch(rawgUrl, { cache: 'no-store' });
+
+  if (!response.ok) {
+    throw new Error(`RAWG respondió con ${response.status}`);
+  }
+
+  const data = await response.json();
+  return Array.isArray(data.results) ? data.results : [];
 };
 
 /* const gameNames = `
@@ -449,7 +461,6 @@ const coverCache = (() => {
 })();
 
 const saveCoverCache = () => localStorage.setItem('nexort-cover-cache-v2', JSON.stringify(coverCache));
-
 const parseLinksMarkdown = (markdown) => {
   const gamesFromLinks = [];
   const linkPattern = /^##\s+(.+?)\s*\r?\n-\s+(\S+)/gm;
@@ -495,16 +506,244 @@ const normalizeGameName = (name) => name
   .replace(/[^a-z0-9]+/g, ' ')
   .trim();
 
+const getCoverFallbackText = (title = 'Juego') => {
+  const text = title.trim();
+  if (!text) return 'J';
+  const initials = text
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join('');
+  return initials || 'J';
+};
+
+const steamAppIds = {
+  '7 days to die': 251570,
+  'among us': 945360,
+  'ark survival ascended': 2399830,
+  'ark survival evolved': 346110,
+  'assassins creed 2': 33230,
+  'assassins creed mirage': 2198900,
+  'assassins creed shadows': 2516860,
+  'assassins creed valhalla': 2208920,
+  'assassins creed iii remastered': 208480,
+  'assassins creed iv black flag': 242050,
+  'assassins creed odyssey': 812140,
+  'assassins creed origins': 582160,
+  'assassins creed rogue': 271590,
+  'assassins creed syndicate': 368500,
+  'assassins creed unity': 289650,
+  'avatar frontiers of pandora': 2028250,
+  'battlefield v': 1238840,
+  'black myth wukong': 2358720,
+  'call of duty black ops 6': 0,
+  'call of duty black ops ii': 202970,
+  'call of duty black ops iii': 311210,
+  'call of duty modern warfare': 1938090,
+  'call of duty modern warfare 3': 1938090,
+  'cities skylines': 255710,
+  'cities skylines ii': 949230,
+  'cyberpunk 2077': 1091500,
+  'days gone': 1241960,
+  'dayz': 221100,
+  'dead by daylight': 381210,
+  'dead space': 1693980,
+  'doom': 9050,
+  'doom eternal': 782330,
+  'doom the dark ages': 0,
+  'elden ring': 1245620,
+  'enshrouded': 0,
+  'euro truck simulator 2': 227300,
+  'fallout 4': 377160,
+  'far cry 3': 220240,
+  'far cry 4': 298110,
+  'far cry 5': 552520,
+  'far cry 6': 2369390,
+  'farming simulator 25': 2559280,
+  'forza horizon 4': 1297590,
+  'forza horizon 5': 1551360,
+  'forza horizon 6': 0,
+  'gears 5': 0,
+  'god of war': 2322010,
+  'god of war ragnarok': 2322010,
+  'grand theft auto v': 271590,
+  'green hell': 815370,
+  'halo infinite': 1240440,
+  'halo the master chief collection': 976730,
+  'hollow knight': 367520,
+  'injustice 2': 627270,
+  'mortal kombat 1': 1971870,
+  'mortal kombat x': 201710,
+  'mortal kombat 11': 202970,
+  'metro exodus': 412020,
+  'metro 2033 redux': 287390,
+  'metro 2033': 286690,
+  'metro awakening': 0,
+  'metro last light redux': 287390,
+  'need for speed': 0,
+  'need for speed hot pursuit': 0,
+  'need for speed shift': 0,
+  'need for speed undercover': 0,
+  'need for speed heat': 1151640,
+  'need for speed hot pursuit remastered': 0,
+  'need for speed most wanted': 0,
+  'need for speed payback': 0,
+  'need for speed rivals': 0,
+  'need for speed unbound': 1846380,
+  'night of the dead': 0,
+  'no mans sky': 275850,
+  'phasmophobia': 739630,
+  'project zomboid': 108600,
+  'raft': 648800,
+  'ready or not': 1144200,
+  'red dead redemption': 0,
+  'red dead redemption 2': 1174180,
+  'resident evil 4': 254700,
+  'resident evil 5': 21690,
+  'resident evil 6': 221040,
+  'resident evil requiem': 0,
+  'roadcraft': 0,
+  'rust': 252490,
+  'scum': 513710,
+  'shadow of the tomb raider definitive edition': 0,
+  'solo leveling arise overdrive': 0,
+  'sons of the forest': 1326470,
+  'stranded deep': 1102210,
+  'subnautica': 264710,
+  'subnautica 2': 0,
+  'subnautica below zero': 848450,
+  'subsistence': 0,
+  'the forest': 242760,
+  'the last of us part i': 1888930,
+  'the last of us part ii remastered': 1888930,
+  'tomb raider game of the year': 0,
+  'valheim': 892970,
+};
+
+const normalizeForSteamMatch = (value = '') => normalizeGameName(value)
+  .replace(/\bthe\b|\bof\b|\band\b|\bfor\b|\bto\b|\bwith\b/g, ' ')
+  .replace(/\s+/g, ' ')
+  .trim();
+
+const getSteamAssetUrl = (appId, asset) => `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/${asset}`;
+
+const getSteamLogoUrl = (gameName) => {
+  const normalized = normalizeGameName(gameName);
+  const appId = steamAppIds[normalized];
+  if (!appId || appId === 0) return '';
+  return getSteamAssetUrl(appId, 'logo.png');
+};
+
+const getSteamCoverUrl = (gameName) => {
+  const normalized = normalizeGameName(gameName);
+  const appId = steamAppIds[normalized];
+  if (!appId || appId === 0) return '';
+  return getSteamAssetUrl(appId, 'library_600x900_2x.jpg');
+};
+
+const findBestSteamSearchResult = async (gameName) => {
+  const term = encodeURIComponent(gameName);
+  try {
+    const response = await fetch(`https://store.steampowered.com/api/storesearch/?term=${term}&l=spanish&cc=us&snr=1`);
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const items = (data.items || []).filter((entry) =>
+      (entry.type === 'game' || entry.type === 'app' || !entry.type) && Number(entry.id) > 0
+    );
+
+    if (!items.length) return null;
+
+    const target = normalizeForSteamMatch(gameName);
+    const ranked = [...items].sort((a, b) => {
+      const scoreA = getSteamSearchMatchScore(a.name || a.title || '', target);
+      const scoreB = getSteamSearchMatchScore(b.name || b.title || '', target);
+      return scoreB - scoreA;
+    });
+
+    return ranked[0] || null;
+  } catch {
+    return null;
+  }
+};
+
+const getSteamSearchMatchScore = (candidateName, targetName) => {
+  if (!candidateName || !targetName) return 0;
+
+  const normalizedCandidate = normalizeForSteamMatch(candidateName);
+  const normalizedTarget = normalizeForSteamMatch(targetName);
+  let score = 0;
+
+  if (normalizedCandidate === normalizedTarget) score += 100;
+  if (normalizedCandidate.includes(normalizedTarget)) score += 35;
+  if (normalizedTarget.includes(normalizedCandidate)) score += 25;
+
+  const targetTokens = new Set(normalizedTarget.split(' '));
+  const candidateTokens = new Set(normalizedCandidate.split(' '));
+  const overlap = [...targetTokens].filter((token) => candidateTokens.has(token)).length;
+  score += overlap * 8;
+
+  return score;
+};
+
+const getSteamSearchLogoUrl = async (gameName) => {
+  const item = await findBestSteamSearchResult(gameName);
+  if (!item || !item.id) return '';
+  return getSteamAssetUrl(item.id, 'logo.png');
+};
+
+const getSteamSearchCoverUrl = async (gameName) => {
+  const item = await findBestSteamSearchResult(gameName);
+  if (!item || !item.id) return '';
+  return getSteamAssetUrl(item.id, 'library_600x900_2x.jpg');
+};
+
+const buildGeneratedCoverDataUrl = (name) => {
+  const text = getCoverFallbackText(name).slice(0, 2) || 'NX';
+  const palette = [
+    ['#0f172a', '#2563eb'],
+    ['#111827', '#7c3aed'],
+    ['#0b1120', '#22c55e'],
+    ['#1f2937', '#f59e0b'],
+    ['#111827', '#ef4444'],
+    ['#0f172a', '#14b8a6'],
+    ['#111827', '#f97316'],
+    ['#0f172a', '#ec4899'],
+  ];
+  const index = [...name].reduce((sum, char) => sum + char.charCodeAt(0), 0) % palette.length;
+  const [start, end] = palette[index];
+
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 560">
+      <defs>
+        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+          <stop offset="0%" stop-color="${start}"/>
+          <stop offset="100%" stop-color="${end}"/>
+        </linearGradient>
+      </defs>
+      <rect width="400" height="560" fill="url(#g)"/>
+      <circle cx="320" cy="70" r="80" fill="rgba(255,255,255,0.08)"/>
+      <circle cx="90" cy="500" r="110" fill="rgba(255,255,255,0.05)"/>
+      <text x="50%" y="52%" text-anchor="middle" fill="white" font-size="130" font-weight="700" font-family="Arial, Helvetica, sans-serif">${text}</text>
+      <text x="50%" y="78%" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-size="20" font-family="Arial, Helvetica, sans-serif">NEXORT</text>
+    </svg>
+  `;
+
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
+
 const selectedGameTitles = [
   '7 Days to Die', 'Among Us', 'ARK: Survival Ascended', 'ARK: Survival Evolved',
-  "Assassin's Creed 2", "Assassin's Creed Mirage", "Assassin's Creed Shadows",
+  "Assassin's Creed II", "Assassin's Creed Mirage", "Assassin's Creed Shadows",
   "Assassin's Creed Valhalla", "Assassin's Creed III Remastered", "Assassin's Creed IV Black Flag",
+  "Assassin's Creed Black Flag Resynced",
   "Assassin's Creed Odyssey", "Assassin's Creed Origins", "Assassin's Creed Rogue",
   "Assassin's Creed Syndicate", "Assassin's Creed Unity", "Assassin's Creed Director's Cut",
   'Avatar: Frontiers of Pandora', 'Battlefield V', 'Black Myth: Wukong',
   'Call of Duty: Black Ops 6', 'Call of Duty: Black Ops II', 'Call of Duty: Black Ops III',
-  'Call of Duty: Modern Warfare', 'Call of Duty: Modern Warfare 3', 'Cities: Skylines',
-  'Cities: Skylines II', 'Cyberpunk 2077', 'DARK SOULS: REMASTERED', 'Days Gone', 'DayZ',
+  'Call of Duty: Modern Warfare', 'Call of Duty: Modern Warfare III', 'Cities: Skylines',
+  'Cities: Skylines II', 'Cyberpunk 2077', 'Dark Souls: Remastered', 'Days Gone', 'DayZ',
   'Dead by Daylight', 'Dead Space', 'DOOM', 'DOOM Eternal', 'DOOM: The Dark Ages',
   'DRAGON BALL: Sparking! ZERO', 'ELDEN RING', 'Enshrouded', 'Euro Truck Simulator 2',
   'Fallout 4', 'Far Cry 3', 'Far Cry 4', 'Far Cry 5', 'Far Cry 6', 'Farming Simulator 25',
@@ -519,7 +758,7 @@ const selectedGameTitles = [
   'Metro Exodus', 'Metro 2033 Redux', 'Metro 2033', 'Metro: Last Light Redux', 'Metro Awakening',
   'Need for Speed: Hot Pursuit', 'Need for Speed: Shift', 'Need for Speed: Undercover',
   'Need for Speed', 'Need for Speed Heat', 'Need for Speed Hot Pursuit Remastered',
-  'Need for Speed Most Wanted', 'Need for Speed Payback', 'Need for Speed Rivals',
+  'Need for Speed: Most Wanted', 'Need for Speed Payback', 'Need for Speed Rivals',
   'Need for Speed Unbound', 'Night of the Dead', "No Man's Sky", 'Phasmophobia', 'Prince of Persia',
   'Project Zomboid', 'Raft', 'Ready or Not', 'Red Dead Redemption', 'Red Dead Redemption 2',
   'Resident Evil 4', 'Resident Evil 5', 'Resident Evil 6', 'Resident Evil Requiem', 'RoadCraft',
@@ -539,9 +778,14 @@ const getLibraryGames = () => {
 };
 
 const applyGames = (nextGames, sourceName) => {
-  const catalogPlaceholders = selectedGameTitles.map((name) => ({ name, url: '' }));
+  const seenNames = new Set(nextGames.map((game) => normalizeGameName(game.name)));
+  const catalogPlaceholders = selectedGameTitles
+    .filter((name) => !seenNames.has(normalizeGameName(name)))
+    .map((name) => ({ name, url: '' }));
+
   const filteredGames = [...nextGames, ...catalogPlaceholders]
     .filter((game) => selectedGameNames.has(normalizeGameName(game.name)));
+
   games = [...new Map(filteredGames.map((game) => [normalizeGameName(game.name), game])).values()]
     .sort((first, second) => first.name.localeCompare(second.name, 'es', { sensitivity: 'base' }));
   renderGameCatalog('gameCatalog');
@@ -556,31 +800,89 @@ const applyGames = (nextGames, sourceName) => {
   loadGameCovers();
 };
 
-const loadGamesFromSource = async (sourceUrl) => {
-  const payload = /^https?:\/\//i.test(sourceUrl)
-    ? await fetchRemoteJson(sourceUrl)
-    : await (await fetch(sourceUrl, { cache: 'no-store' })).json();
-  const nextGames = parseSourceJson(payload);
-  if (!nextGames.length) throw new Error('No se encontraron juegos compatibles');
-  applyGames(nextGames, sourceUrl);
+const normalizeIgdbCoverUrl = (cover) => {
+  if (!cover || typeof cover !== 'string') return '';
+  const url = cover.startsWith('//') ? `https:${cover}` : cover;
+  return url.replace(/\/t_\w+\//, '/t_cover_big/');
 };
 
-const loadGamesFromLinks = async () => {
+const loadGamesFromApi = async () => {
   try {
-    const response = await fetch('links.md', { cache: 'no-store' });
-    if (!response.ok) throw new Error(`No se pudo cargar links.md (${response.status})`);
+    const response = await fetch(`${PUBLIC_API_BASE_URL}/games`, { cache: 'no-store' });
 
-    const gamesFromLinks = parseLinksMarkdown(await response.text());
-    if (!gamesFromLinks.length) throw new Error('links.md no contiene juegos');
+    if (response.ok) {
+      const data = await response.json();
+      const apiGames = Array.isArray(data.games) ? data.games : [];
 
-    const linkedNames = new Set(gamesFromLinks.map((game) => normalizeGameName(game.name)));
+      if (apiGames.length) {
+        const mappedGames = apiGames.map((game) => ({
+          name: game.name || 'Sin nombre',
+          url: game.website || game.store_url || '',
+          cover: normalizeIgdbCoverUrl(game.cover?.url) || game.background_image || game.image || '',
+          updated: false,
+        })).filter((game) => game.name);
+
+        const linkedNames = new Set(mappedGames.map((game) => normalizeGameName(game.name)));
+        const visibleGames = selectedGameTitles
+          .filter((name) => !linkedNames.has(normalizeGameName(name)))
+          .map((name) => ({ name, url: '' }));
+
+        applyGames([...mappedGames, ...visibleGames], 'API local');
+        return;
+      }
+    }
+  } catch (error) {
+    console.warn('La API local no está disponible, probando RAWG directo:', error.message);
+  }
+
+  try {
+    const rawgGames = await fetchRawgGames();
+    const mappedGames = rawgGames.map((game) => ({
+      name: game.name || 'Sin nombre',
+      url: game.website || '',
+      cover: game.background_image || game.image || '',
+      updated: false,
+    })).filter((game) => game.name);
+
+    const linkedNames = new Set(mappedGames.map((game) => normalizeGameName(game.name)));
     const visibleGames = selectedGameTitles
       .filter((name) => !linkedNames.has(normalizeGameName(name)))
       .map((name) => ({ name, url: '' }));
 
-    applyGames([...gamesFromLinks, ...visibleGames], 'catálogo local');
+    applyGames([...mappedGames, ...visibleGames], 'RAWG directo');
+  } catch (rawgError) {
+    console.warn('RAWG directo no está disponible, usando fallback local:', rawgError.message);
+    if (API_CONFIG.useFallback) {
+      loadGamesFromLinks();
+    }
+  }
+};
+
+const loadGamesFromLinks = async () => {
+  try {
+    let markdownText = LOCAL_LINKS_MARKDOWN;
+
+    try {
+      const response = await fetch('links.md', { cache: 'no-store' });
+      if (response.ok) {
+        markdownText = await response.text();
+      }
+    } catch (fetchError) {
+      console.warn('No se pudo leer links.md desde archivo local; usando catálogo local seguro.', fetchError.message);
+    }
+
+    const gamesFromLinks = parseLinksMarkdown(markdownText);
+    const finalGames = gamesFromLinks.length ? gamesFromLinks : selectedGameTitles.map((name) => ({ name, url: '' }));
+
+    const linkedNames = new Set(finalGames.map((game) => normalizeGameName(game.name)));
+    const visibleGames = selectedGameTitles
+      .filter((name) => !linkedNames.has(normalizeGameName(name)))
+      .map((name) => ({ name, url: '' }));
+
+    applyGames([...finalGames, ...visibleGames], 'catálogo local');
   } catch (error) {
-      console.error('No se pudo cargar links.md:', error.message);
+    console.error('No se pudo cargar links.md:', error.message);
+    applyGames(selectedGameTitles.map((name) => ({ name, url: '' })), 'catálogo local');
   }
 };
 
@@ -588,22 +890,33 @@ const renderGameCatalog = (containerId, catalogGames = games) => {
   const container = document.getElementById(containerId);
   if (!container) return;
 
-  container.innerHTML = catalogGames.map((game) => `
-    <div class="game-row">
-      <div class="game-cover${game.cover ? ' loading' : ''}" aria-label="Portada de ${game.name}">
-        ${game.cover
-          ? `<img src="${game.cover}" crossorigin="anonymous" data-fallback="${game.fallbackCover || ''}" alt="Portada de ${game.name}" loading="lazy">`
-          : `<span>${game.name}</span>`}
-      </div>
-      <span class="game-name">${game.name}</span>
+  container.innerHTML = catalogGames.map((game) => {
+    const coverSource = typeof game.cover === 'string' && game.cover ? game.cover : buildGeneratedCoverDataUrl(game.name);
+    const isLogoAsset = /\/logo\.png(?:\?.*)?$/i.test(coverSource) || /\/logo\.[a-z0-9]+(?:\?.*)?$/i.test(coverSource);
+    const hasDownload = Boolean(game.url && game.url !== 'PENDIENTE');
+    const actionLabel = hasDownload ? 'Descargar' : 'PENDIENTE';
+    const actionMarkup = hasDownload
+      ? `<a class="primary-button download-link" href="${game.url}" target="_blank" rel="noopener noreferrer" data-game="${game.name}">Descargar</a>`
+      : `<button class="secondary-button pending-button" type="button" disabled>PENDIENTE</button>`;
+
+    return `
+      <div class="game-row">
+        <div class="game-cover loading" aria-label="Logo de ${game.name}">
+          <img src="${coverSource}" class="${isLogoAsset ? 'game-logo' : ''}" data-fallback="${game.fallbackCover || buildGeneratedCoverDataUrl(game.name)}" alt="Logo de ${game.name}" loading="lazy">
+        </div>
+        <span class="game-name">${game.name}</span>
+        <div class="game-actions">
+          ${actionMarkup}
+        </div>
         <button class="secondary-button icon-button library-toggle" type="button" aria-label="${state.library.has(game.name) ? 'Quitar de biblioteca' : 'Agregar a biblioteca'}" title="${state.library.has(game.name) ? 'Quitar de biblioteca' : 'Agregar a biblioteca'}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5A2.5 2.5 0 0 1 7.5 1H20v18H7.5A2.5 2.5 0 0 0 5 21.5v-18ZM7.5 3a.5.5 0 0 0-.5.5v12.1c.16-.06.33-.1.5-.1H18V3H7.5Z"/></svg>
         </button>
         <button class="secondary-button icon-button favorite-toggle" type="button" aria-label="${state.favorites.has(game.name) ? 'Quitar favorito' : 'Agregar a favoritos'}" title="${state.favorites.has(game.name) ? 'Quitar favorito' : 'Agregar a favoritos'}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 21-1.45-1.32C5.4 15.36 2 12.28 2 8.5A4.5 4.5 0 0 1 6.5 4c1.74 0 3.41.81 4.5 2.09A6.05 6.05 0 0 1 15.5 4 4.5 4.5 0 0 1 20 8.5c0 3.78-3.4 6.86-8.55 11.18L12 21Z"/></svg>
         </button>
-    </div>
-  `).join('');
+      </div>
+    `;
+  }).join('');
 
   container.querySelectorAll('img[data-fallback]').forEach((image) => {
     image.addEventListener('error', () => {
@@ -615,10 +928,10 @@ const renderGameCatalog = (containerId, catalogGames = games) => {
       }
 
       const cover = image.closest('.game-cover');
-      image.remove();
+      const fallbackLabel = document.createElement('span');
+      fallbackLabel.textContent = getCoverFallbackText(cover?.getAttribute('aria-label')?.replace('Portada de ', '') || 'Juego');
       if (cover) {
-        const fallbackLabel = document.createElement('span');
-        fallbackLabel.textContent = cover.getAttribute('aria-label')?.replace('Portada de ', '') || 'Juego';
+        cover.innerHTML = '';
         cover.appendChild(fallbackLabel);
       }
       cover?.classList.remove('loading');
@@ -684,67 +997,25 @@ const showGameDetails = (game) => {
 };
 
 const loadGameCovers = async () => {
-  let nextGame = 0;
-  const assignedCoverIds = new Set();
-  const workers = Array.from({ length: 6 }, async () => {
-    while (nextGame < games.length) {
-      const game = games[nextGame];
-      nextGame += 1;
-      const cacheKey = normalizeGameName(game.name);
-      const cachedCover = coverCache[cacheKey];
-      const cachedAppId = typeof cachedCover === 'object' ? cachedCover.id : cachedCover;
-      const cachedFallback = typeof cachedCover === 'object' ? cachedCover.fallback : '';
+  for (const game of games) {
+    const preferredCover = game.cover || game.background_image || game.image || '';
 
-      if (cachedAppId && !assignedCoverIds.has(String(cachedAppId))) {
-        assignedCoverIds.add(String(cachedAppId));
-          game.cover = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${cachedAppId}/library_600x900_2x.jpg`;
-          game.fallbackCover = cachedFallback || `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${cachedAppId}/capsule_231x87.jpg`;
-        renderGameCatalog('gameCatalog');
-        renderExploreCatalog();
-        renderGameCatalog('gameCatalogLibrary', getLibraryGames());
-        continue;
-      }
-
-      try {
-        const steamUrl = `https://steamcommunity.com/actions/SearchApps/${encodeURIComponent(game.name)}`;
-        const result = await fetchRemoteJson(steamUrl);
-        const steamItems = Array.isArray(result)
-          ? result.map((item) => ({
-            id: item.appid,
-            name: item.name,
-            tiny_image: item.icon || item.logo,
-          }))
-          : result.items || [];
-        const normalizeTitle = normalizeGameName;
-        const normalizedName = normalizeTitle(game.name);
-        const additionalContent = /dlc|soundtrack|redkit|demo|test server|playtest|texture pack|expansion|editor|tool|mod|ost|beta/i;
-        const items = steamItems.filter((item) => item.id && item.name && !additionalContent.test(item.name));
-        const exactMatches = items.filter((item) => normalizeTitle(item.name) === normalizedName);
-        const titledMatches = items.filter((item) => normalizeTitle(item.name).startsWith(normalizedName));
-        const match = [...exactMatches, ...titledMatches]
-          .find((item) => !assignedCoverIds.has(String(item.id)));
-        if (match?.id) {
-          assignedCoverIds.add(String(match.id));
-          coverCache[cacheKey] = { id: match.id, fallback: match.tiny_image || '' };
-          saveCoverCache();
-          game.cover = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${match.id}/library_600x900_2x.jpg`;
-          game.fallbackCover = `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${match.id}/capsule_231x87.jpg`;
-        }
-      } catch (error) {
-        console.info(`No se encontró portada para ${game.name}:`, error.message);
-      }
-
-      renderGameCatalog('gameCatalog');
-      renderExploreCatalog();
-      renderGameCatalog('gameCatalogLibrary', getLibraryGames());
-      renderGameCatalog('gameCatalogUpdates', games.filter((item) => item.updated));
-      renderFavoritesCatalog();
-      updateCatalogEmptyStates();
-      updateProfileStats();
+    if (preferredCover) {
+      game.cover = preferredCover;
+      game.fallbackCover = preferredCover;
+      continue;
     }
-  });
 
-  await Promise.all(workers);
+    const generatedCover = buildGeneratedCoverDataUrl(game.name);
+    game.cover = generatedCover;
+    game.fallbackCover = generatedCover;
+  }
+
+  renderGameCatalog('gameCatalog');
+  renderExploreCatalog();
+  renderGameCatalog('gameCatalogLibrary', getLibraryGames());
+  renderGameCatalog('gameCatalogUpdates', games.filter((game) => game.updated));
+  renderFavoritesCatalog();
 };
 
 const clearDemoData = () => {
@@ -1104,4 +1375,4 @@ document.addEventListener('click', (event) => {
 });
 
 clearDemoData();
-loadGamesFromLinks();
+loadGamesFromApi();

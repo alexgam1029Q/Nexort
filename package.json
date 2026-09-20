@@ -1,0 +1,15 @@
+{
+  "name": "nexort-api",
+  "version": "1.0.0",
+  "description": "API para NEXORT",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}

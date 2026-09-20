@@ -657,6 +657,10 @@ button:hover {
   border-radius: 7px;
 }
 
+.game-cover img.game-logo {
+  object-fit: contain;
+  padding: 10px 8px;
+  background: linear-gradient(180deg, rgba(10, 16, 24, 0.16), rgba(10, 16, 24, 0.4));
 }
 
 .game-name {
@@ -1227,7 +1231,7 @@ button:hover {
 
 .game-row {
   display: grid;
-  grid-template-columns: 62px minmax(0, 1fr) 34px 34px;
+  grid-template-columns: 62px minmax(0, 1fr) 120px 34px 34px;
   align-items: center;
   gap: 16px;
   padding: 16px 18px;
@@ -1243,6 +1247,35 @@ button:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.game-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.pending-button {
+  min-width: 96px;
+  padding: 9px 12px;
+  border-radius: 12px;
+  background: rgba(23, 29, 40, 0.9);
+  border: 1px solid rgba(100, 196, 255, 0.2);
+  color: rgba(203, 217, 235, 0.8);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: default;
+}
+
+.download-link,
+.pending-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 96px;
+  min-height: 40px;
 }
 
 .download-link {
@@ -1273,7 +1306,7 @@ button:hover {
 
 @media (max-width: 560px) {
   .game-row {
-    grid-template-columns: 50px minmax(0, 1fr) 34px 34px;
+    grid-template-columns: 50px minmax(0, 1fr) 90px 34px 34px;
     gap: 10px;
     padding: 12px;
   }
@@ -1284,8 +1317,11 @@ button:hover {
     height: 64px;
   }
 
-  .download-link {
-    padding: 9px;
+  .download-link,
+  .pending-button {
+    min-width: 74px;
+    padding: 8px 10px;
+    font-size: 0.68rem;
   }
 
   .download-link span {
