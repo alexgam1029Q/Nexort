@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NEXORT | Launcher</title>
+    <meta
+      name="description"
+      content="NEXORT launcher, plataforma moderna para descubrir, descargar y gestionar juegos."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand-wrap">
+          <div class="brand-glow"></div>
+          <img src="Assets/Logo.png" alt="NEXORT logo" class="brand-logo" />
+        </div>
+
+        <nav class="nav" aria-label="Principal">
+          <button class="nav-item active" data-view="home">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1v-9.5Z"/></svg>
+            </span>
+            <span class="nav-label">Inicio</span>
+          </button>
+          <button class="nav-item" data-view="explore">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 3a7 7 0 0 1 5.39 11.95l4.79 4.79 1.41-1.41-4.79-4.79A7 7 0 1 1 10 3Zm0 2a5 5 0 1 0 3.54 8.54A5 5 0 0 0 10 5Z"/></svg>
+            </span>
+            <span class="nav-label">Explorar</span>
+          </button>
+          <button class="nav-item" data-view="library">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v18H6.5A2.5 2.5 0 0 0 4 23.5v-18Zm2.5-.5a.5.5 0 0 0-.5.5v13a.5.5 0 0 0 .5.5h12V5H6.5Z"/></svg>
+            </span>
+            <span class="nav-label">Biblioteca</span>
+          </button>
+          <button class="nav-item" data-view="updates">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4a7.5 7.5 0 0 0-7 11.76L3 14.5v5h5l-1.9-1.9A7.48 7.48 0 0 0 12 19.5a7.5 7.5 0 0 0 7.35-9.46ZM12 8v4l2.8 2.8-1.4 1.4L11 14.5V8h1Z"/></svg>
+            </span>
+            <span class="nav-label">Actualizaciones</span>
+          </button>
+          <button class="nav-item" data-view="favorites">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 21-1.45-1.32C5.4 15.36 2 12.28 2 8.5A4.5 4.5 0 0 1 6.5 4c1.74 0 3.41.81 4.5 2.09A6.05 6.05 0 0 1 15.5 4 4.5 4.5 0 0 1 20 8.5c0 3.78-3.4 6.86-8.55 11.18L12 21Z"/></svg>
+            </span>
+            <span class="nav-label">Favoritos</span>
+          </button>
+        </nav>
+
+        <div class="nav-footer">
+          <button class="nav-item small" data-view="profile">
+            <span class="nav-icon">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4Zm0 2c-4.42 0-8 2.24-8 5v1h16v-1c0-2.76-3.58-5-8-5Z"/></svg>
+            </span>
+            <span class="nav-label">Perfil</span>
+          </button>
+        </div>
+      </aside>
+
+      <main class="main-area">
+        <header class="topbar">
+          <div class="search-shell">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 2a8 8 0 0 1 6.32 13.64l4.39 4.39 1.41-1.41-4.39-4.39A8 8 0 1 1 10 2Zm0 2a6 6 0 1 0 4.24 10.24A6 6 0 0 0 10 4Z"/></svg>
+            <input type="text" placeholder="Buscar juegos..." aria-label="Buscar juegos" />
+          </div>
+          <div class="topbar-actions">
+            <div class="status-pill online">
+              <span class="dot"></span>
+              Online
+            </div>
+            <button class="ghost-button" id="toggleSidebar">Minimizar</button>
+          </div>
+        </header>
+
+        <section class="view-panel active" data-view="home">
+          <div class="catalog-list" id="gameCatalog"></div>
+        </section>
+
+        <section class="view-panel" data-view="explore">
+          <div class="catalog-list" id="gameCatalogExplore"></div>
+          <div class="empty-state" id="exploreEmpty">
+            <h2>Busca un juego</h2>
+            <p>Escribe en el buscador para encontrar títulos del catálogo.</p>
+          </div>
+        </section>
+
+        <section class="view-panel" data-view="details">
+          <div class="source-panel" id="detailsContent">
+            <span class="eyebrow">JUEGO</span>
+            <h2>Selecciona un juego</h2>
+            <p>Haz clic en una fila del catálogo para ver sus detalles.</p>
+          </div>
+        </section>
+
+        <section class="view-panel" data-view="library">
+          <div class="library-toolbar">
+            <label for="libraryFilter">Mostrar</label>
+            <select id="libraryFilter">
+              <option value="all">Todos</option>
+              <option value="favorites">Favoritos</option>
+              <option value="updates">Con actualización</option>
+            </select>
+          </div>
+          <div class="catalog-list" id="gameCatalogLibrary"></div>
+          <div class="empty-state" id="libraryEmpty">
+            <h2>Biblioteca vacía</h2>
+            <p>Agrega juegos desde Inicio o Explorar para verlos aquí.</p>
+          </div>
+        </section>
+
+        <section class="view-panel" data-view="profile">
+          <div class="source-panel profile-panel">
+            <span class="eyebrow">PERFIL</span>
+            <h2 id="profileHeading">Tu perfil</h2>
+            <label for="profileName">Nombre visible</label>
+            <div class="source-controls">
+              <input id="profileName" type="text" placeholder="Escribe tu nombre" />
+              <button class="primary-button" id="saveProfile" type="button">Guardar perfil</button>
+            </div>
+            <small id="profileStatus">Tu perfil se guarda en este navegador.</small>
+            <div class="profile-stats" id="profileStats"></div>
+          </div>
+        </section>
+
+        <section class="view-panel" data-view="favorites">
+          <div class="catalog-list" id="gameCatalogFavorites"></div>
+          <div class="empty-state" id="favoritesEmpty">
+            <h2>Sin favoritos</h2>
+            <p>Marca juegos como favoritos para guardarlos aquí.</p>
+          </div>
+        </section>
+
+        <section class="view-panel" data-view="updates">
+          <div class="catalog-list" id="gameCatalogUpdates"></div>
+          <div class="empty-state" id="updatesEmpty">
+            <h2>Sin actualizaciones</h2>
+            <p>No hay paquetes ni parches pendientes.</p>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
