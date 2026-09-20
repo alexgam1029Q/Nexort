@@ -18,7 +18,7 @@ const API_CONFIG = {
 };
 
 const LOCAL_LINKS_MARKDOWN = '';
-const PUBLIC_API_BASE_URL = API_CONFIG.baseUrl;
+const PUBLIC_API_BASE_URL = '';
 
 const fetchRawgGames = async () => {
   const apiKey = (RAWG_CREDENTIALS.apiKey || '').trim();
@@ -237,6 +237,14 @@ Indiana Jones and the Great Circle
 `.trim().split('\n'); */
 
 let games = [];
+
+const buildFallbackCatalog = () => selectedGameTitles.map((name) => ({
+  name,
+  url: '',
+  cover: buildGeneratedCoverDataUrl(name),
+  fallbackCover: buildGeneratedCoverDataUrl(name),
+  updated: false,
+}));
 
 /*
 GTA V
@@ -463,16 +471,52 @@ const coverCache = (() => {
 const saveCoverCache = () => localStorage.setItem('nexort-cover-cache-v2', JSON.stringify(coverCache));
 const parseLinksMarkdown = (markdown) => {
   const gamesFromLinks = [];
-  const linkPattern = /^##\s+(.+?)\s*\r?\n-\s+(\S+)/gm;
+  const linkPattern = /^##\s+(.+?)\s*\r?\n-\s*(.+)$/gm;
   let match;
 
   while ((match = linkPattern.exec(markdown)) !== null) {
     const name = match[1].trim();
-    if (name.startsWith('*')) continue;
-    gamesFromLinks.push({ name, url: match[2] === 'PENDIENTE' ? '' : match[2] });
+    if (!name || name.startsWith('*')) continue;
+    const rawValue = (match[2] || '').trim();
+    const url = rawValue === 'PENDIENTE' || !rawValue ? '' : rawValue;
+    gamesFromLinks.push({ name, url });
   }
 
-  return [...new Map(gamesFromLinks.map((game) => [game.name, game])).values()];
+  return [...new Map(gamesFromLinks.map((game) => [normalizeGameName(game.name), { ...game, name: game.name }])).values()];
+};
+
+const mergeCatalogEntries = (...groups) => {
+  const merged = new Map();
+
+  for (const group of groups) {
+    for (const game of group || []) {
+      const key = normalizeGameName(game?.name || '');
+      if (!key) continue;
+      const existing = merged.get(key) || {};
+      merged.set(key, {
+        ...existing,
+        ...game,
+        name: game?.name || existing.name,
+        url: game?.url || existing.url || '',
+        cover: game?.cover || existing.cover || '',
+        fallbackCover: game?.fallbackCover || existing.fallbackCover || game?.cover || existing.cover || '',
+        updated: Boolean(game?.updated || existing.updated),
+      });
+    }
+  }
+
+  return [...merged.values()];
+};
+
+const readLinksCatalog = async () => {
+  try {
+    const response = await fetch('links.md', { cache: 'no-store' });
+    if (!response.ok) return [];
+    const markdown = await response.text();
+    return parseLinksMarkdown(markdown);
+  } catch {
+    return [];
+  }
 };
 
 const parseSourceJson = (payload) => {
@@ -778,12 +822,13 @@ const getLibraryGames = () => {
 };
 
 const applyGames = (nextGames, sourceName) => {
-  const seenNames = new Set(nextGames.map((game) => normalizeGameName(game.name)));
+  const safeNextGames = Array.isArray(nextGames) && nextGames.length ? nextGames : buildFallbackCatalog();
+  const seenNames = new Set(safeNextGames.map((game) => normalizeGameName(game.name)));
   const catalogPlaceholders = selectedGameTitles
     .filter((name) => !seenNames.has(normalizeGameName(name)))
-    .map((name) => ({ name, url: '' }));
+    .map((name) => ({ name, url: '', cover: buildGeneratedCoverDataUrl(name), fallbackCover: buildGeneratedCoverDataUrl(name) }));
 
-  const filteredGames = [...nextGames, ...catalogPlaceholders]
+  const filteredGames = [...safeNextGames, ...catalogPlaceholders]
     .filter((game) => selectedGameNames.has(normalizeGameName(game.name)));
 
   games = [...new Map(filteredGames.map((game) => [normalizeGameName(game.name), game])).values()]
@@ -807,33 +852,7 @@ const normalizeIgdbCoverUrl = (cover) => {
 };
 
 const loadGamesFromApi = async () => {
-  try {
-    const response = await fetch(`${PUBLIC_API_BASE_URL}/games`, { cache: 'no-store' });
-
-    if (response.ok) {
-      const data = await response.json();
-      const apiGames = Array.isArray(data.games) ? data.games : [];
-
-      if (apiGames.length) {
-        const mappedGames = apiGames.map((game) => ({
-          name: game.name || 'Sin nombre',
-          url: game.website || game.store_url || '',
-          cover: normalizeIgdbCoverUrl(game.cover?.url) || game.background_image || game.image || '',
-          updated: false,
-        })).filter((game) => game.name);
-
-        const linkedNames = new Set(mappedGames.map((game) => normalizeGameName(game.name)));
-        const visibleGames = selectedGameTitles
-          .filter((name) => !linkedNames.has(normalizeGameName(name)))
-          .map((name) => ({ name, url: '' }));
-
-        applyGames([...mappedGames, ...visibleGames], 'API local');
-        return;
-      }
-    }
-  } catch (error) {
-    console.warn('La API local no está disponible, probando RAWG directo:', error.message);
-  }
+  const localLinks = await readLinksCatalog();
 
   try {
     const rawgGames = await fetchRawgGames();
@@ -844,16 +863,16 @@ const loadGamesFromApi = async () => {
       updated: false,
     })).filter((game) => game.name);
 
-    const linkedNames = new Set(mappedGames.map((game) => normalizeGameName(game.name)));
+    const mergedGames = mergeCatalogEntries(localLinks, mappedGames);
+    const linkedNames = new Set(mergedGames.map((game) => normalizeGameName(game.name)));
     const visibleGames = selectedGameTitles
       .filter((name) => !linkedNames.has(normalizeGameName(name)))
       .map((name) => ({ name, url: '' }));
 
-    applyGames([...mappedGames, ...visibleGames], 'RAWG directo');
-  } catch (rawgError) {
-    console.warn('RAWG directo no está disponible, usando fallback local:', rawgError.message);
+    applyGames([...mergedGames, ...visibleGames], 'RAWG directo');
+  } catch {
     if (API_CONFIG.useFallback) {
-      loadGamesFromLinks();
+      applyGames(mergeCatalogEntries(localLinks, buildFallbackCatalog()), 'catálogo seguro');
     }
   }
 };
@@ -872,17 +891,17 @@ const loadGamesFromLinks = async () => {
     }
 
     const gamesFromLinks = parseLinksMarkdown(markdownText);
-    const finalGames = gamesFromLinks.length ? gamesFromLinks : selectedGameTitles.map((name) => ({ name, url: '' }));
+    const finalGames = gamesFromLinks.length ? gamesFromLinks : buildFallbackCatalog();
 
     const linkedNames = new Set(finalGames.map((game) => normalizeGameName(game.name)));
     const visibleGames = selectedGameTitles
       .filter((name) => !linkedNames.has(normalizeGameName(name)))
-      .map((name) => ({ name, url: '' }));
+      .map((name) => ({ name, url: '', cover: buildGeneratedCoverDataUrl(name), fallbackCover: buildGeneratedCoverDataUrl(name) }));
 
     applyGames([...finalGames, ...visibleGames], 'catálogo local');
   } catch (error) {
     console.error('No se pudo cargar links.md:', error.message);
-    applyGames(selectedGameTitles.map((name) => ({ name, url: '' })), 'catálogo local');
+    applyGames(buildFallbackCatalog(), 'catálogo local');
   }
 };
 
