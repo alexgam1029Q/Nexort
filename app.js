@@ -20,21 +20,153 @@ const API_CONFIG = {
 const LOCAL_LINKS_MARKDOWN = '';
 const PUBLIC_API_BASE_URL = '';
 
+const RAWG_TITLE_ALIASES = {
+  'Among Us': ['Among Us'],
+  'ARK: Survival Ascended': ['ARK: Survival Ascended', 'Ark: Survival Ascended'],
+  'ARK: Survival Evolved': ['ARK: Survival Evolved', 'Ark: Survival Evolved'],
+  'Assassin\'s Creed II': ['Assassin\'s Creed II', 'Assassin\'s Creed 2'],
+  "Assassin's Creed Black Flag Resynced": ['Assassin\'s Creed IV: Black Flag', 'Assassin\'s Creed IV Black Flag', 'Assassin\'s Creed Black Flag Resynced'],
+  "Assassin's Creed Director's Cut": ['Assassin\'s Creed: Director\'s Cut', 'Assassin\'s Creed Director\'s Cut'],
+  'Battlefield V': ['Battlefield V', 'Battlefield 5'],
+  'Black Myth: Wukong': ['Black Myth: Wukong', 'Black Myth Wukong'],
+  'Call of Duty: Black Ops 6': ['Call of Duty: Black Ops 6', 'Call of Duty Black Ops 6'],
+  'Call of Duty: Black Ops II': ['Call of Duty: Black Ops 2', 'Call of Duty: Black Ops II'],
+  'Call of Duty: Black Ops III': ['Call of Duty: Black Ops 3', 'Call of Duty: Black Ops III'],
+  'Call of Duty: Modern Warfare': ['Call of Duty: Modern Warfare', 'Call of Duty Modern Warfare'],
+  'Call of Duty: Modern Warfare III': ['Call of Duty: Modern Warfare 3', 'Call of Duty: Modern Warfare III'],
+  'Cities: Skylines': ['Cities: Skylines', 'Cities Skylines'],
+  'Cities: Skylines II': ['Cities: Skylines 2', 'Cities: Skylines II'],
+  'Dark Souls: Remastered': ['Dark Souls: Remastered', 'Dark Souls Remastered', 'Dark Souls 3'],
+  'DOOM': ['DOOM', 'Doom'],
+  'DOOM Eternal': ['DOOM Eternal', 'Doom Eternal'],
+  'Dead Space': ['Dead Space', 'Dead Space Remake'],
+  'ELDEN RING': ['Elden Ring', 'ELDEN RING'],
+  'Enshrouded': ['Enshrouded'],
+  'Far Cry 3': ['Far Cry 3'],
+  'Far Cry 4': ['Far Cry 4'],
+  'Far Cry 5': ['Far Cry 5'],
+  'Far Cry 6': ['Far Cry 6'],
+  'Forza Horizon 4': ['Forza Horizon 4'],
+  'Forza Horizon 5': ['Forza Horizon 5'],
+  'God of War': ['God of War'],
+  'God of War Ragnarök': ['God of War Ragnarök', 'God of War Ragnarok'],
+  'Grand Theft Auto V': ['Grand Theft Auto V', 'GTA V'],
+  'Grand Theft Auto IV: The Complete Edition': ['Grand Theft Auto IV', 'GTA IV'],
+  'Grand Theft Auto: San Andreas - The Definitive Edition': ['Grand Theft Auto: San Andreas', 'Grand Theft Auto San Andreas'],
+  'Grand Theft Auto: Vice City - The Definitive Edition': ['Grand Theft Auto: Vice City', 'Grand Theft Auto Vice City'],
+  'Halo: The Master Chief Collection': ['Halo: The Master Chief Collection', 'Halo MCC'],
+  'Hollow Knight: Silksong': ['Hollow Knight: Silksong', 'Hollow Knight Silksong'],
+  'Need for Speed Heat': ['Need for Speed Heat'],
+  'Need for Speed Unbound': ['Need for Speed Unbound'],
+  'No Man\'s Sky': ['No Man\'s Sky', 'No Mans Sky'],
+  'Phasmophobia': ['Phasmophobia'],
+  'Project Zomboid': ['Project Zomboid'],
+  'Ready or Not': ['Ready or Not'],
+  'Red Dead Redemption 2': ['Red Dead Redemption 2', 'RDR2'],
+  'Resident Evil 4': ['Resident Evil 4', 'Resident Evil 4 Remake'],
+  'Resident Evil 5': ['Resident Evil 5'],
+  'Resident Evil 6': ['Resident Evil 6'],
+  'Resident Evil Requiem': ['Resident Evil Requiem'],
+  'Rust': ['Rust'],
+  'SCUM': ['SCUM'],
+  'Sons Of The Forest': ['Sons of the Forest', 'Sons Of The Forest'],
+  'Stranded Deep': ['Stranded Deep'],
+  'Subnautica': ['Subnautica'],
+  'Subnautica 2': ['Subnautica 2'],
+  'Subnautica: Below Zero': ['Subnautica: Below Zero', 'Subnautica Below Zero'],
+  'The Forest': ['The Forest'],
+  'The Last of Us Part I': ['The Last of Us Part I', 'The Last of Us: Part I'],
+  'The Last of Us Part II Remastered': ['The Last of Us Part II Remastered', 'The Last of Us Part II'],
+  'Tomb Raider Game of the Year': ['Tomb Raider', 'Tomb Raider: Game of the Year Edition'],
+  'Subsistence': ['Subsistence'],
+  'Solo Leveling: ARISE OVERDRIVE': ['Solo Leveling: ARISE OVERDRIVE', 'Solo Leveling ARISE OVERDRIVE'],
+  'Valheim': ['Valheim'],
+};
+
+const RAWG_BATCH_SIZE = 18;
+const RAWG_CACHE_KEY = 'nexort-rawg-search-cache-v1';
+const translationCache = new Map();
+
+const rawgSearchCache = (() => {
+  try {
+    return JSON.parse(localStorage.getItem(RAWG_CACHE_KEY) || '{}');
+  } catch {
+    return {};
+  }
+})();
+
+const saveRawgSearchCache = () => {
+  try {
+    localStorage.setItem(RAWG_CACHE_KEY, JSON.stringify(rawgSearchCache));
+  } catch {
+    // La caché no debe impedir que cargue el catálogo.
+  }
+};
+
+const getRawgSearchVariants = (title) => {
+  const cleanTitle = title
+    .replace(/[':]/g, '')
+    .replace(/[-–—]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const variants = new Set([
+    title,
+    ...(RAWG_TITLE_ALIASES[title] || []),
+    cleanTitle,
+    title.replace(/:/g, ''),
+    title.replace(/'/g, ''),
+    title.replace(/:/g, ' '),
+    title.replace(/'/g, ' '),
+    title.toLowerCase(),
+    cleanTitle.toLowerCase(),
+  ]);
+
+  return [...variants].filter(Boolean);
+};
+
 const fetchRawgGames = async () => {
   const apiKey = (RAWG_CREDENTIALS.apiKey || '').trim();
   if (!apiKey || apiKey === 'TU_RAWG_API_KEY') {
     throw new Error('Falta la API key de RAWG');
   }
 
-  const rawgUrl = `https://api.rawg.io/api/games?key=${encodeURIComponent(apiKey)}&page_size=20&ordering=-released`;
-  const response = await fetch(rawgUrl, { cache: 'no-store' });
+  const targetTitles = selectedGameTitles.slice(0, RAWG_MAX_TITLES);
+  const results = [];
 
-  if (!response.ok) {
-    throw new Error(`RAWG respondió con ${response.status}`);
+  for (let index = 0; index < targetTitles.length; index += RAWG_BATCH_SIZE) {
+    const batch = targetTitles.slice(index, index + RAWG_BATCH_SIZE);
+    const batchResults = await Promise.all(batch.map(async (title) => {
+      const aliasList = getRawgSearchVariants(title);
+
+      if (rawgSearchCache[title]) return rawgSearchCache[title];
+
+      for (const variant of aliasList) {
+        try {
+          const searchUrl = `https://api.rawg.io/api/games?key=${encodeURIComponent(apiKey)}&search=${encodeURIComponent(variant)}&page_size=1`;
+          const response = await fetch(searchUrl, { cache: 'force-cache' });
+          if (!response.ok) continue;
+
+          const data = await response.json();
+          const game = Array.isArray(data.results) ? data.results[0] : null;
+          if (game) {
+            const result = { ...game, name: title, rawgName: game.name || title };
+            rawgSearchCache[title] = result;
+            saveRawgSearchCache();
+            return result;
+          }
+        } catch {
+          // intenta con la siguiente variante
+        }
+      }
+
+      return null;
+    }));
+
+    results.push(...batchResults.filter(Boolean));
   }
 
-  const data = await response.json();
-  return Array.isArray(data.results) ? data.results : [];
+  return results;
 };
 
 /* const gameNames = `
@@ -237,6 +369,10 @@ Indiana Jones and the Great Circle
 `.trim().split('\n'); */
 
 let games = [];
+let nintendoGames = [];
+let phoneGames = [];
+let xboxGames = [];
+let playStationGames = [];
 
 const buildFallbackCatalog = () => selectedGameTitles.map((name) => ({
   name,
@@ -446,6 +582,7 @@ const saveStoredSet = (key, values) => {
 
 const state = {
   activeView: 'home',
+  activePlatform: 'PC',
   downloads: new Map(),
   favorites: readStoredSet('nexort-favorites'),
   library: readStoredSet('nexort-library'),
@@ -510,10 +647,291 @@ const mergeCatalogEntries = (...groups) => {
 
 const readLinksCatalog = async () => {
   try {
-    const response = await fetch('links.md', { cache: 'no-store' });
+    const response = await fetch('Links/Links PC.md', { cache: 'no-store' });
     if (!response.ok) return [];
     const markdown = await response.text();
     return parseLinksMarkdown(markdown);
+  } catch {
+    return [];
+  }
+};
+
+const readNintendoLinksCatalog = async () => {
+  try {
+    const response = await fetch('Links/Links Nintendo.md', { cache: 'no-store' });
+    if (!response.ok) return [];
+    const markdown = await response.text();
+    const entries = [];
+    const nintendoCoverMap = {
+      'the legend of zelda tears of the kingdom': 'https://media.rawg.io/media/games/556/55684bfd048706f4266d331d70050b37.jpg',
+      'the legend of zelda breath of the wild': 'https://media.rawg.io/media/games/cc1/cc196a5ad763955d6532cdba236f730c.jpg',
+    };
+    const lines = markdown.split(/\r?\n/);
+    let currentSection = 'games';
+    let currentEmulatorStatus = '';
+    let currentEmulatorPlatform = '';
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index].trim();
+      if (/^##\s+Emuladores\s*$/i.test(line)) {
+        currentSection = 'emulators';
+        currentEmulatorStatus = '';
+        currentEmulatorPlatform = 'Nintendo Switch';
+        continue;
+      }
+      if (/^##\s+Juegos\s*$/i.test(line)) {
+        currentSection = 'games';
+        currentEmulatorStatus = '';
+        currentEmulatorPlatform = '';
+        continue;
+      }
+      if (currentSection === 'emulators' && /^###\s+🎮\s+Emuladores de Nintendo Switch\s*$/i.test(line)) {
+        currentEmulatorPlatform = 'Nintendo Switch';
+        currentEmulatorStatus = '';
+        continue;
+      }
+      if (currentSection === 'emulators' && /^###\s+🟢\s+Activos\s*$/i.test(line)) {
+        currentEmulatorStatus = 'Activos';
+        continue;
+      }
+      if (currentSection === 'emulators' && /^###\s+🔴\s+Descontinuados\s*$/i.test(line)) {
+        currentEmulatorStatus = 'Descontinuados';
+        continue;
+      }
+      if (currentSection === 'emulators' && /^###\s+🎮\s+Emuladores de Wii U para PC\s*$/i.test(line)) {
+        currentEmulatorPlatform = 'Wii U';
+        currentEmulatorStatus = 'Emuladores de Wii U para PC';
+        continue;
+      }
+
+      const entryMatch = line.match(/^(?:###|####)\s+(.+?)\s*$/);
+      if (!entryMatch) continue;
+
+      const name = entryMatch[1].trim();
+      const fields = {};
+      let fieldIndex = index + 1;
+      while (fieldIndex < lines.length && /^-\s*/.test(lines[fieldIndex].trim())) {
+        const fieldMatch = lines[fieldIndex].trim().match(/^[-]\s*(Descarga|Actualización|DLC|Keys and Firmware|USB Helper|Keys|Firmware):\s*(.*)$/i);
+        if (fieldMatch) {
+          const fieldName = fieldMatch[1].toLowerCase();
+          fields[fieldName] = fieldMatch[2].trim();
+          if (fieldName === 'keys and firmware') {
+            fields.keys = fieldMatch[2].trim();
+            fields.firmware = fieldMatch[2].trim();
+          }
+        }
+        fieldIndex += 1;
+      }
+      const plainValue = (lines[index + 1] || '').replace(/^[-]\s*/, '').trim();
+      const rawValue = fields.descarga || (plainValue.includes(': ') ? '' : plainValue);
+      const normalizedName = normalizeGameName(name);
+      const isEdenEntry = normalizedName === 'eden';
+      const isCemuEntry = normalizedName === 'cemu';
+      entries.push({
+        name,
+        url: rawValue === 'PENDIENTE' || !rawValue ? '' : rawValue,
+        updatesUrl: fields['actualización'] && fields['actualización'] !== 'PENDIENTE' ? fields['actualización'] : '',
+        dlcUrl: fields.dlc && fields.dlc !== 'PENDIENTE' ? fields.dlc : '',
+        keysUrl: isEdenEntry && fields.keys && fields.keys !== 'PENDIENTE' ? fields.keys : '',
+        firmwareUrl: isEdenEntry && fields.firmware && fields.firmware !== 'PENDIENTE' ? fields.firmware : '',
+        usbHelperUrl: isCemuEntry && fields['usb helper'] && fields['usb helper'] !== 'PENDIENTE' ? fields['usb helper'] : '',
+        cover: NINTENDO_EMULATOR_LOGOS[normalizedName]
+          || nintendoCoverMap[normalizedName]
+          || buildGeneratedCoverDataUrl(name),
+        fallbackCover: buildGeneratedCoverDataUrl(name),
+        platforms: ['Nintendo'],
+        category: currentSection,
+        emulatorStatus: currentEmulatorStatus,
+        emulatorPlatform: currentEmulatorPlatform,
+        description: currentSection === 'emulators'
+          ? NINTENDO_EMULATOR_DESCRIPTIONS[normalizedName] || `${name} es un emulador de Nintendo.`
+          : '',
+        descriptionEs: currentSection === 'emulators'
+          ? NINTENDO_EMULATOR_DESCRIPTIONS[normalizedName] || `${name} es un emulador de Nintendo.`
+          : '',
+      });
+    }
+
+    return entries;
+  } catch {
+    return [];
+  }
+};
+
+const PHONE_EMULATOR_LOGO_MAP = {
+  bluestacks: 'https://www.google.com/s2/favicons?sz=256&domain=bluestacks.com',
+  ldplayer: 'https://www.google.com/s2/favicons?sz=256&domain=ldplayer.net',
+  memuplay: 'https://www.google.com/s2/favicons?sz=256&domain=memuplay.com',
+  'memu play': 'https://www.google.com/s2/favicons?sz=256&domain=memuplay.com',
+  noxplayer: 'https://www.google.com/s2/favicons?sz=256&domain=bignox.com',
+  mumuplayer: 'https://www.google.com/s2/favicons?sz=256&domain=mumuplayer.com',
+  'mumu player': 'https://www.google.com/s2/favicons?sz=256&domain=mumuplayer.com',
+  gameloop: 'https://www.google.com/s2/favicons?sz=256&domain=gameloop.fun',
+  'android studio emulator': 'https://www.google.com/s2/favicons?sz=256&domain=developer.android.com',
+  genymotion: 'https://www.google.com/s2/favicons?sz=256&domain=genymotion.com',
+  waydroid: 'https://www.google.com/s2/favicons?sz=256&domain=waydro.id',
+  primeos: 'https://www.google.com/s2/favicons?sz=256&domain=primeos.in',
+  'playstation emulators': 'https://www.google.com/s2/favicons?sz=256&domain=playstation.com',
+  'xbox emulators': 'https://www.google.com/s2/favicons?sz=256&domain=xbox.com',
+};
+
+const PLAYSTATION_EMULATOR_DESCRIPTIONS = {
+  duckstation: 'Emulador de PlayStation 1 enfocado en precisión, rendimiento y facilidad de configuración, con mejoras gráficas y múltiples opciones de personalización.',
+  pcsx2: 'Emulador de PlayStation 2 de código abierto que ofrece mejoras de resolución, gráficos, guardados rápidos y numerosas opciones de configuración.',
+  rpcs3: 'Emulador de PlayStation 3 de código abierto para PC, con compatibilidad con numerosos juegos y opciones avanzadas de configuración.',
+  shadps4: 'Emulador experimental de PlayStation 4 para PC, actualmente en desarrollo y con compatibilidad creciente para diferentes juegos.',
+  kyty: 'Proyecto experimental relacionado con la emulación de PlayStation 4 y PlayStation 5, con compatibilidad limitada y desarrollo activo.',
+};
+
+const XBOX_EMULATOR_DESCRIPTIONS = {
+  xemu: 'Emulador de Xbox original para PC enfocado en ofrecer una experiencia precisa y compatible, con soporte para numerosos juegos y diferentes opciones de configuración.',
+  xenia: 'Emulador de Xbox 360 de código abierto para PC, diseñado para ejecutar juegos de la consola con mejoras de rendimiento y compatibilidad en constante desarrollo.',
+  'cxbx reloaded': 'Emulador de Xbox original de código abierto para Windows, capaz de ejecutar determinados juegos mediante emulación y recompilación del código de la consola.',
+};
+
+const NINTENDO_EMULATOR_DESCRIPTIONS = {
+  eden: 'Desarrollo activo; tiene versiones recientes para Windows, Linux y macOS.',
+  'kenji nx': 'Desarrollo activo; sus repositorios muestran actividad durante septiembre de 2026.',
+  ryubing: 'Fork de Ryujinx con repositorios y proyectos comunitarios actualmente mantenidos.',
+  ryujinx: 'El proyecto original fue descontinuado.',
+  yuzu: 'Desarrollo original descontinuado.',
+  sudachi: 'Desarrollo discontinuado.',
+  citron: 'Desarrollo discontinuado.',
+  suyu: 'Proyecto discontinuado.',
+  torzu: 'Proyecto derivado de Yuzu cuyo desarrollo ya no se considera activo.',
+  strato: 'Proyecto experimental cuyo desarrollo fue abandonado.',
+  cemu: 'Emulador de Wii U para Windows, Linux y macOS, con desarrollo activo y capacidad para ejecutar gran parte del catálogo de Wii U.',
+  decaf: 'Emulador de Wii U de código abierto orientado principalmente a investigación y desarrollo; cuenta con builds para Windows y Linux, aunque sigue siendo experimental.',
+};
+
+const NINTENDO_EMULATOR_LOGOS = {
+  eden: 'https://eden-emu.dev/assets/logos/named_logo.png',
+  'kenji nx': 'https://www.google.com/s2/favicons?sz=256&domain=github.com',
+  ryubing: 'https://www.google.com/s2/favicons?sz=256&domain=github.com',
+  ryujinx: 'https://www.google.com/s2/favicons?sz=256&domain=github.com',
+  yuzu: 'https://www.google.com/s2/favicons?sz=256&domain=yuzu-emu.org',
+  sudachi: 'https://www.google.com/s2/favicons?sz=256&domain=github.com',
+  citron: 'https://www.google.com/s2/favicons?sz=256&domain=github.com',
+  suyu: 'https://www.google.com/s2/favicons?sz=256&domain=github.com',
+  torzu: 'https://www.google.com/s2/favicons?sz=256&domain=github.com',
+  strato: 'https://www.google.com/s2/favicons?sz=256&domain=github.com',
+  cemu: 'https://www.google.com/s2/favicons?sz=256&domain=cemu.info',
+  decaf: 'https://www.google.com/s2/favicons?sz=256&domain=github.com',
+};
+
+const readPlatformSpecificCatalog = async (fileName, platformName, categoryName, customLogoMap = {}) => {
+  try {
+    const response = await fetch(fileName, { cache: 'no-store' });
+    if (!response.ok) return [];
+    const markdown = await response.text();
+    const entries = [];
+    const lines = markdown.split(/\r?\n/);
+    let currentPlatformGroup = '';
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const line = lines[index].trim();
+      const sectionMatch = line.match(/^###\s+🎮\s*(.+?)\s*$/);
+      if (sectionMatch) {
+        currentPlatformGroup = sectionMatch[1].trim();
+        continue;
+      }
+
+      const entryMatch = line.match(/^(?:###|####)\s+(?!🎮)(.+?)\s*$/);
+      if (!entryMatch) continue;
+
+      const name = entryMatch[1].trim();
+      const entryLines = lines.slice(index + 1, index + 10);
+      const firstLink = entryLines.find((line) => /^-\s*https?:\/\//i.test(line.trim()));
+      const plainValue = firstLink ? firstLink.trim().replace(/^[-]\s*/, '').trim() : '';
+      const mappedLogo = customLogoMap[normalizeGameName(name)] || PHONE_EMULATOR_LOGO_MAP[normalizeGameName(name)] || '';
+      const normalizedName = normalizeGameName(name);
+      const descriptionMap = platformName === 'PlayStation'
+        ? PLAYSTATION_EMULATOR_DESCRIPTIONS
+        : platformName === 'Xbox'
+          ? XBOX_EMULATOR_DESCRIPTIONS
+          : {};
+      const description = descriptionMap[normalizedName] || '';
+
+      entries.push({
+        name,
+        url: plainValue && plainValue !== 'PENDIENTE' ? plainValue : '',
+        cover: mappedLogo || buildGeneratedCoverDataUrl(name),
+        fallbackCover: buildGeneratedCoverDataUrl(name),
+        platforms: [platformName],
+        platformGroup: currentPlatformGroup,
+        category: categoryName,
+        description: description || `${name} es un emulador compatible con ${platformName}, pensado para ejecutar juegos y contenido de esa plataforma.`,
+        descriptionEs: description || `${name} es un emulador compatible con ${platformName}, pensado para ejecutar juegos y contenido de esa plataforma.`,
+        genres: ['Emulador'],
+        developers: [name],
+        released: '2024-01-01',
+      });
+    }
+
+    return entries;
+  } catch {
+    return [];
+  }
+};
+
+const readPhoneLinksCatalog = async () => {
+  try {
+    const response = await fetch('Links/Links Telefono.md', { cache: 'no-store' });
+    if (!response.ok) return [];
+    const markdown = await response.text();
+    const entries = [];
+    const lines = markdown.split(/\r?\n/);
+
+    for (let index = 0; index < lines.length; index += 1) {
+      const entryMatch = lines[index].trim().match(/^###\s+(.+?)\s*$/);
+      if (!entryMatch) continue;
+
+      const name = entryMatch[1].trim();
+      const plainValue = (lines[index + 1] || '').replace(/^[-]\s*/, '').trim();
+      const keysLine = (lines[index + 2] || '').trim().match(/^[-]\s*Keys and Firmware:\s*(.*)$/i);
+      const keysUrl = keysLine?.[1] && keysLine[1] !== 'PENDIENTE' ? keysLine[1] : '';
+      const versionFiveLine = lines.slice(index + 1, index + 5).find((line) => /^[-]\s*BlueStacks 5:/i.test(line.trim()));
+      const versionTenLine = lines.slice(index + 1, index + 5).find((line) => /^[-]\s*BlueStacks 10:/i.test(line.trim()));
+      const versionFiveValue = versionFiveLine?.trim().replace(/^[-]\s*BlueStacks 5:\s*/i, '') || '';
+      const versionTenValue = versionTenLine?.trim().replace(/^[-]\s*BlueStacks 10:\s*/i, '') || '';
+      const mappedLogo = PHONE_EMULATOR_LOGO_MAP[normalizeGameName(name)] || '';
+      const isEdenEntry = normalizeGameName(name) === 'eden';
+
+      const isPhoneEmulator = true;
+      const phoneDescriptions = {
+        bluestacks: 'BlueStacks — Emulador de Android para PC enfocado en ejecutar juegos y aplicaciones móviles con buen rendimiento y numerosas opciones de configuración.',
+        ldplayer: 'LDPlayer — Emulador ligero de Android diseñado principalmente para gaming, con controles personalizables, múltiples instancias y optimizaciones de rendimiento.',
+        memuplay: 'MEmu Play — Emulador de Android para Windows que permite ejecutar juegos y aplicaciones con controles configurables, múltiples instancias y diferentes versiones de Android.',
+        noxplayer: 'NoxPlayer — Emulador de Android para PC que ofrece controles de teclado y mouse, grabación de macros, múltiples instancias y compatibilidad con numerosas aplicaciones.',
+        mumuplayer: 'MuMu Player — Emulador de Android orientado a juegos móviles, con soporte para controles, ajustes de rendimiento y funciones para jugar en una pantalla grande.',
+        gameloop: 'GameLoop — Emulador desarrollado principalmente para juegos móviles competitivos, con controles optimizados para teclado y mouse y herramientas específicas para gaming.',
+        'android studio emulator': 'Android Studio Emulator — Emulador oficial incluido en Android Studio, pensado principalmente para desarrolladores que necesitan probar aplicaciones en diferentes dispositivos y versiones de Android.',
+        genymotion: 'Genymotion — Plataforma de emulación de Android orientada principalmente al desarrollo y las pruebas, con diferentes dispositivos virtuales y configuraciones del sistema.',
+        waydroid: 'Waydroid — Solución que permite ejecutar aplicaciones Android en Linux integrándolas con el escritorio, utilizando un contenedor en lugar de una máquina virtual tradicional.',
+        primeos: 'PrimeOS — Sistema operativo basado en Android diseñado para instalarse en PC, ofreciendo una experiencia similar a un escritorio y soporte para aplicaciones y juegos Android.',
+      };
+      const defaultPhoneDescription = phoneDescriptions[normalizeGameName(name)] || `${name} es un emulador para Android que permite ejecutar juegos y apps móviles con mejor rendimiento, compatibilidad y acceso rápido a modos de juego.`;
+
+      entries.push({
+        name,
+        url: plainValue && !plainValue.includes(': ') && plainValue !== 'PENDIENTE' ? plainValue : '',
+        keysUrl,
+        versionFiveUrl: versionFiveValue !== 'PENDIENTE' ? versionFiveValue : '',
+        versionTenUrl: versionTenValue !== 'PENDIENTE' ? versionTenValue : '',
+        cover: mappedLogo || buildGeneratedCoverDataUrl(name),
+        fallbackCover: buildGeneratedCoverDataUrl(name),
+        platforms: ['Telefono'],
+        category: 'phone-emulators',
+        description: isEdenEntry ? 'Eden — Emulador de Nintendo Switch de código abierto para PC, enfocado en ejecutar juegos de Switch mediante una arquitectura de emulación compatible con diferentes sistemas de escritorio.' : defaultPhoneDescription,
+        descriptionEs: isEdenEntry ? 'Eden — Emulador de Nintendo Switch de código abierto para PC, enfocado en ejecutar juegos de Switch mediante una arquitectura de emulación compatible con diferentes sistemas de escritorio.' : defaultPhoneDescription,
+        genres: isEdenEntry ? ['Emulador', 'Nintendo'] : ['Emulador', 'Android'],
+        developers: isEdenEntry ? ['Eden Emulators'] : [name],
+        released: isEdenEntry ? '2022-03-11' : '2024-01-01',
+        background: mappedLogo || buildGeneratedCoverDataUrl(name),
+      });
+    }
+
+    return entries;
   } catch {
     return [];
   }
@@ -814,6 +1232,8 @@ const selectedGameTitles = [
 
 const selectedGameNames = new Set(selectedGameTitles.map(normalizeGameName));
 
+const RAWG_MAX_TITLES = selectedGameTitles.length;
+
 const getLibraryGames = () => {
   const libraryGames = games.filter((game) => state.library.has(game.name));
   if (libraryFilter?.value === 'favorites') return libraryGames.filter((game) => state.favorites.has(game.name));
@@ -842,7 +1262,6 @@ const applyGames = (nextGames, sourceName) => {
   updateProfileStats();
   updateSearchVisibility();
   void sourceName;
-  loadGameCovers();
 };
 
 const normalizeIgdbCoverUrl = (cover) => {
@@ -853,13 +1272,25 @@ const normalizeIgdbCoverUrl = (cover) => {
 
 const loadGamesFromApi = async () => {
   const localLinks = await readLinksCatalog();
+  const fallbackGames = mergeCatalogEntries(localLinks, buildFallbackCatalog());
+  applyGames(fallbackGames, 'catálogo inmediato');
 
   try {
     const rawgGames = await fetchRawgGames();
     const mappedGames = rawgGames.map((game) => ({
-      name: game.name || 'Sin nombre',
+      name: game.name || game.rawgName || 'Sin nombre',
+      rawgId: game.id || 0,
       url: game.website || '',
       cover: game.background_image || game.image || '',
+      background: game.background_image_additional || game.background_image || '',
+      description: game.description_raw || '',
+      genres: Array.isArray(game.genres) ? game.genres.map((item) => item.name).filter(Boolean) : [],
+      developers: Array.isArray(game.developers) ? game.developers.map((item) => item.name).filter(Boolean) : [],
+      platforms: Array.isArray(game.platforms) ? game.platforms.map((item) => item.platform?.name).filter(Boolean) : [],
+      released: game.released || '',
+      screenshots: Array.isArray(game.short_screenshots)
+        ? game.short_screenshots.map((item) => item.image).filter(Boolean)
+        : [],
       updated: false,
     })).filter((game) => game.name);
 
@@ -869,10 +1300,12 @@ const loadGamesFromApi = async () => {
       .filter((name) => !linkedNames.has(normalizeGameName(name)))
       .map((name) => ({ name, url: '' }));
 
-    applyGames([...mergedGames, ...visibleGames], 'RAWG directo');
+    const finalGames = [...mergedGames, ...visibleGames];
+    applyGames(finalGames, 'RAWG directo');
+    setTimeout(() => loadGameCovers(), 0);
   } catch {
     if (API_CONFIG.useFallback) {
-      applyGames(mergeCatalogEntries(localLinks, buildFallbackCatalog()), 'catálogo seguro');
+      applyGames(fallbackGames, 'catálogo seguro');
     }
   }
 };
@@ -882,12 +1315,12 @@ const loadGamesFromLinks = async () => {
     let markdownText = LOCAL_LINKS_MARKDOWN;
 
     try {
-      const response = await fetch('links.md', { cache: 'no-store' });
+      const response = await fetch('Links/Links PC.md', { cache: 'no-store' });
       if (response.ok) {
         markdownText = await response.text();
       }
     } catch (fetchError) {
-      console.warn('No se pudo leer links.md desde archivo local; usando catálogo local seguro.', fetchError.message);
+      console.warn('No se pudo leer Links PC.md desde archivo local; usando catálogo local seguro.', fetchError.message);
     }
 
     const gamesFromLinks = parseLinksMarkdown(markdownText);
@@ -900,9 +1333,75 @@ const loadGamesFromLinks = async () => {
 
     applyGames([...finalGames, ...visibleGames], 'catálogo local');
   } catch (error) {
-    console.error('No se pudo cargar links.md:', error.message);
+    console.error('No se pudo cargar Links PC.md:', error.message);
     applyGames(buildFallbackCatalog(), 'catálogo local');
   }
+};
+
+const loadPlatformLists = async () => {
+  nintendoGames = await readNintendoLinksCatalog();
+  phoneGames = await readPhoneLinksCatalog();
+
+  try {
+    xboxGames = await readPlatformSpecificCatalog(
+      'Links/Links Xbox.md',
+      'Xbox',
+      'xbox-emulators',
+      {
+        'xbox emulators': 'https://www.google.com/s2/favicons?sz=256&domain=xbox.com',
+        xemu: 'https://www.google.com/s2/favicons?sz=256&domain=xemu.app',
+        xenia: 'https://www.google.com/s2/favicons?sz=256&domain=xenia.jp',
+        'cxbx reloaded': 'https://www.google.com/s2/favicons?sz=256&domain=github.com',
+      }
+    );
+  } catch {
+    xboxGames = [];
+  }
+
+  try {
+    playStationGames = await readPlatformSpecificCatalog(
+      'Links/Links Play Station.md',
+      'PlayStation',
+      'playstation-emulators',
+      {
+        'playstation emulators': 'https://www.google.com/s2/favicons?sz=256&domain=playstation.com',
+        pcsx2: 'https://www.google.com/s2/favicons?sz=256&domain=pcsx2.net',
+        duckstation: 'https://www.google.com/s2/favicons?sz=256&domain=duckstation.org',
+        retroarch: 'https://www.google.com/s2/favicons?sz=256&domain=retroarch.com',
+      }
+    );
+  } catch {
+    playStationGames = [];
+  }
+
+  const apiKey = (RAWG_CREDENTIALS.apiKey || '').trim();
+  if (apiKey && apiKey !== 'TU_RAWG_API_KEY') {
+    nintendoGames = await Promise.all(nintendoGames.map(async (game) => {
+      const isEmulatorEntry = game.category === 'emulators' || game.category === 'phone-emulators';
+      if (isEmulatorEntry) return game;
+
+      try {
+        const response = await fetch(`https://api.rawg.io/api/games?key=${encodeURIComponent(apiKey)}&search=${encodeURIComponent(game.name)}&page_size=1`, { cache: 'force-cache' });
+        if (!response.ok) return game;
+
+        const data = await response.json();
+        const result = data.results?.[0];
+        if (!result?.background_image) return game;
+
+        return {
+          ...game,
+          rawgId: result.id || 0,
+          cover: result.background_image,
+          background: result.background_image_additional || result.background_image,
+          fallbackCover: game.fallbackCover,
+        };
+      } catch {
+        return game;
+      }
+    }));
+  }
+
+  renderPlatformCatalog();
 };
 
 const renderGameCatalog = (containerId, catalogGames = games) => {
@@ -911,21 +1410,48 @@ const renderGameCatalog = (containerId, catalogGames = games) => {
 
   container.innerHTML = catalogGames.map((game) => {
     const coverSource = typeof game.cover === 'string' && game.cover ? game.cover : buildGeneratedCoverDataUrl(game.name);
-    const isLogoAsset = /\/logo\.png(?:\?.*)?$/i.test(coverSource) || /\/logo\.[a-z0-9]+(?:\?.*)?$/i.test(coverSource);
+    const isLogoAsset = /\/logo\.png(?:\?.*)?$/i.test(coverSource) || /\/logo\.[a-z0-9]+(?:\?.*)?$/i.test(coverSource) || /\/named_logo\.[a-z0-9]+(?:\?.*)?$/i.test(coverSource) || /google\.com\/s2\/favicons/i.test(coverSource);
+    const isBlueStacks = game.category === 'phone-emulators' && normalizeGameName(game.name) === 'bluestacks';
+    const isPhoneEmulator = game.category === 'phone-emulators';
     const hasDownload = Boolean(game.url && game.url !== 'PENDIENTE');
-    const actionLabel = hasDownload ? 'Descargar' : 'PENDIENTE';
     const actionMarkup = hasDownload
       ? `<a class="primary-button download-link" href="${game.url}" target="_blank" rel="noopener noreferrer" data-game="${game.name}">Descargar</a>`
       : `<button class="secondary-button pending-button" type="button" disabled>PENDIENTE</button>`;
+    const extraActionsMarkup = game.category === 'games'
+      ? `
+        ${game.updatesUrl ? `<a class="primary-button content-link" href="${game.updatesUrl}" target="_blank" rel="noopener noreferrer">Actualizaciones</a>` : '<button class="secondary-button pending-button content-link" type="button" disabled>Actualizaciones</button>'}
+        ${game.dlcUrl ? `<a class="primary-button content-link" href="${game.dlcUrl}" target="_blank" rel="noopener noreferrer">DLC</a>` : '<button class="secondary-button pending-button content-link" type="button" disabled>DLC</button>'}
+      `
+      : isBlueStacks
+        ? `
+          <div class="bluestacks-version-row">
+            ${game.versionFiveUrl ? `<a class="primary-button content-link bluestacks-version" href="${game.versionFiveUrl}" target="_blank" rel="noopener noreferrer">BlueStacks 5</a>` : '<button class="secondary-button pending-button content-link bluestacks-version" type="button" disabled>BlueStacks 5</button>'}
+            ${game.versionTenUrl ? `<a class="primary-button content-link bluestacks-version" href="${game.versionTenUrl}" target="_blank" rel="noopener noreferrer">BlueStacks 10</a>` : '<button class="secondary-button pending-button content-link bluestacks-version" type="button" disabled>BlueStacks 10</button>'}
+          </div>
+          <div class="bluestacks-download-row">${actionMarkup}</div>
+        `
+      : game.category === 'emulators' && (game.keysUrl || game.firmwareUrl || game.usbHelperUrl)
+        ? `
+          ${game.keysUrl || game.firmwareUrl ? `<a class="primary-button content-link combined-content-link" href="${game.keysUrl || game.firmwareUrl}" target="_blank" rel="noopener noreferrer">Keys and Firmware</a>` : ''}
+          ${game.usbHelperUrl ? `<a class="primary-button content-link combined-content-link" href="${game.usbHelperUrl}" target="_blank" rel="noopener noreferrer">USB Helper</a>` : ''}
+        `
+        : isPhoneEmulator
+          ? `
+            <div class="phone-emulator-actions">
+              ${hasDownload ? `<a class="primary-button content-link combined-content-link" href="${game.url}" target="_blank" rel="noopener noreferrer">Descargar</a>` : '<button class="secondary-button pending-button content-link combined-content-link" type="button" disabled>Descargar</button>'}
+            </div>
+          `
+          : '';
 
     return `
-      <div class="game-row">
+      <div class="game-row${['games', 'emulators', 'phone-emulators', 'xbox-emulators', 'playstation-emulators'].includes(game.category) ? ' content-game-row' : ''}">
         <div class="game-cover loading" aria-label="Logo de ${game.name}">
           <img src="${coverSource}" class="${isLogoAsset ? 'game-logo' : ''}" data-fallback="${game.fallbackCover || buildGeneratedCoverDataUrl(game.name)}" alt="Logo de ${game.name}" loading="lazy">
         </div>
         <span class="game-name">${game.name}</span>
-        <div class="game-actions">
-          ${actionMarkup}
+        <div class="game-actions${isBlueStacks ? ' bluestacks-actions' : ''}">
+          ${isBlueStacks || isPhoneEmulator ? '' : actionMarkup}
+          ${extraActionsMarkup}
         </div>
         <button class="secondary-button icon-button library-toggle" type="button" aria-label="${state.library.has(game.name) ? 'Quitar de biblioteca' : 'Agregar a biblioteca'}" title="${state.library.has(game.name) ? 'Quitar de biblioteca' : 'Agregar a biblioteca'}">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3.5A2.5 2.5 0 0 1 7.5 1H20v18H7.5A2.5 2.5 0 0 0 5 21.5v-18ZM7.5 3a.5.5 0 0 0-.5.5v12.1c.16-.06.33-.1.5-.1H18V3H7.5Z"/></svg>
@@ -936,6 +1462,19 @@ const renderGameCatalog = (containerId, catalogGames = games) => {
       </div>
     `;
   }).join('');
+
+  container.querySelectorAll('.game-row').forEach((row) => {
+    row.addEventListener('click', (event) => {
+      if (event.target.closest('button, a')) return;
+      const gameName = row.querySelector('.game-name')?.textContent.trim();
+      const allCatalogEntries = [...games, ...nintendoGames, ...phoneGames, ...xboxGames, ...playStationGames];
+      const game = allCatalogEntries.find((item) => item.name === gameName);
+      if (game) {
+        showGameDetails(game);
+        openView('details');
+      }
+    });
+  });
 
   container.querySelectorAll('img[data-fallback]').forEach((image) => {
     image.addEventListener('error', () => {
@@ -986,6 +1525,101 @@ const renderFavoritesCatalog = () => {
   if (emptyState) emptyState.style.display = favoriteGames.length ? 'none' : '';
 };
 
+const renderNintendoCatalog = () => {
+  const container = document.getElementById('gameCatalogPlatforms');
+  if (!container) return;
+
+  const emulators = nintendoGames.filter((game) => game.category === 'emulators');
+  const titles = nintendoGames.filter((game) => game.category !== 'emulators');
+  const switchEmulators = emulators.filter((game) => game.emulatorPlatform === 'Nintendo Switch');
+  const activeEmulators = switchEmulators.filter((game) => game.emulatorStatus === 'Activos');
+  const discontinuedEmulators = switchEmulators.filter((game) => game.emulatorStatus === 'Descontinuados');
+  const ungroupedSwitchEmulators = switchEmulators.filter((game) => !['Activos', 'Descontinuados'].includes(game.emulatorStatus));
+  const wiiUEmulators = emulators.filter((game) => game.emulatorPlatform === 'Wii U');
+  container.innerHTML = `
+    ${switchEmulators.length ? '<h2 class="platform-section-title">Emuladores de Nintendo Switch</h2>' : ''}
+    ${ungroupedSwitchEmulators.length ? '<div id="nintendoSwitchEmulators" class="catalog-list"></div>' : ''}
+    ${activeEmulators.length ? '<h2 class="platform-section-title">Activos</h2><div id="nintendoActiveEmulators" class="catalog-list"></div>' : ''}
+    ${discontinuedEmulators.length ? '<h2 class="platform-section-title">Descontinuados</h2><div id="nintendoDiscontinuedEmulators" class="catalog-list"></div>' : ''}
+    ${wiiUEmulators.length ? '<h2 class="platform-section-title">Emuladores de Wii U para PC</h2><div id="nintendoWiiUEmulators" class="catalog-list"></div>' : ''}
+    ${titles.length ? '<h2 class="platform-section-title">Juegos</h2><div id="nintendoGames" class="catalog-list"></div>' : ''}
+  `;
+
+  if (ungroupedSwitchEmulators.length) renderGameCatalog('nintendoSwitchEmulators', ungroupedSwitchEmulators);
+  if (activeEmulators.length) renderGameCatalog('nintendoActiveEmulators', activeEmulators);
+  if (discontinuedEmulators.length) renderGameCatalog('nintendoDiscontinuedEmulators', discontinuedEmulators);
+  if (wiiUEmulators.length) renderGameCatalog('nintendoWiiUEmulators', wiiUEmulators);
+  if (titles.length) renderGameCatalog('nintendoGames', titles);
+  return nintendoGames;
+};
+
+const renderPlatformSpecificCatalog = (platformName, items) => {
+  const container = document.getElementById('gameCatalogPlatforms');
+  if (!container) return [];
+
+  const parsedItems = Array.isArray(items) ? items : [];
+  const groupedItems = parsedItems.reduce((groups, item) => {
+    const groupName = item.platformGroup || 'Emuladores';
+    if (!groups.has(groupName)) groups.set(groupName, []);
+    groups.get(groupName).push(item);
+    return groups;
+  }, new Map());
+
+  container.innerHTML = `${[...groupedItems.keys()].map((groupName, index) => `
+    <section class="platform-emulator-group">
+      <h2 class="platform-section-title">${escapeHtml(groupName)}</h2>
+      <div id="${platformName.toLowerCase()}PlatformList${index}" class="catalog-list"></div>
+    </section>
+  `).join('')}<section class="platform-games-group">
+    <h2 class="platform-section-title">Juegos</h2>
+    <div id="${platformName.toLowerCase()}GamesList" class="catalog-list"></div>
+  </section>`;
+
+  [...groupedItems.entries()].forEach(([groupName, groupItems], index) => {
+    renderGameCatalog(`${platformName.toLowerCase()}PlatformList${index}`, groupItems);
+  });
+  return parsedItems;
+};
+
+const renderPlatformCatalog = () => {
+  const selectedPlatform = state.activePlatform;
+  const platformCatalogTitle = document.getElementById('platformCatalogTitle');
+  if (platformCatalogTitle) {
+    platformCatalogTitle.textContent = ['Telefono', 'Xbox', 'PlayStation'].includes(selectedPlatform) ? 'Emuladores' : 'Juegos';
+    platformCatalogTitle.style.display = selectedPlatform === 'Nintendo' ? 'none' : '';
+  }
+
+  let platformGames = [];
+
+  if (selectedPlatform === 'Telefono') {
+    platformGames = phoneGames;
+  } else if (selectedPlatform === 'Xbox') {
+    platformGames = xboxGames;
+  } else if (selectedPlatform === 'PlayStation') {
+    platformGames = playStationGames;
+  } else if (selectedPlatform === 'Nintendo') {
+    platformGames = renderNintendoCatalog();
+  } else if (selectedPlatform === 'all') {
+    platformGames = games;
+  } else {
+    platformGames = games.filter((game) => {
+      const platforms = Array.isArray(game.platforms) ? game.platforms : [];
+      return platforms.some((platform) => {
+        const name = String(platform).toLowerCase();
+        return name.includes(selectedPlatform.toLowerCase());
+      });
+    });
+  }
+
+  if (['Telefono', 'Xbox', 'PlayStation'].includes(selectedPlatform)) {
+    renderPlatformSpecificCatalog(selectedPlatform, platformGames);
+  } else if (selectedPlatform !== 'Nintendo') {
+    renderGameCatalog('gameCatalogPlatforms', platformGames);
+  }
+  const emptyState = document.getElementById('platformsEmpty');
+  if (emptyState) emptyState.style.display = platformGames.length ? 'none' : '';
+};
+
 const updateCatalogEmptyStates = () => {
   const updatesEmpty = document.getElementById('updatesEmpty');
   if (updatesEmpty) updatesEmpty.style.display = games.some((game) => game.updated) ? 'none' : '';
@@ -1001,18 +1635,157 @@ const updateProfileStats = () => {
   `;
 };
 
+const escapeHtml = (value = '') => String(value)
+  .replace(/&/g, '&amp;')
+  .replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;')
+  .replace(/'/g, '&#039;');
+
+const formatReleaseDate = (date) => {
+  if (!date) return 'Sin fecha';
+  const parsedDate = new Date(`${date}T00:00:00`);
+  return Number.isNaN(parsedDate.getTime()) ? date : parsedDate.toLocaleDateString('es-ES', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+};
+
+const translateDescriptionToSpanish = async (description) => {
+  const sourceText = String(description || '').trim();
+  if (!sourceText) return '';
+  if (translationCache.has(sourceText)) return translationCache.get(sourceText);
+
+  try {
+    const textToTranslate = sourceText.slice(0, 4500);
+    const response = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=es&dt=t&q=${encodeURIComponent(textToTranslate)}`, { cache: 'force-cache' });
+    if (!response.ok) return sourceText;
+
+    const payload = await response.json();
+    const translated = Array.isArray(payload?.[0])
+      ? payload[0].map((part) => part?.[0] || '').join('').trim()
+      : '';
+    const result = translated || sourceText;
+    translationCache.set(sourceText, result);
+    return result;
+  } catch {
+    return sourceText;
+  }
+};
+
+const fetchRawgDetails = async (game) => {
+  if (!game || game.detailsLoaded) return;
+
+  const emulatorCategories = ['emulators', 'phone-emulators', 'xbox-emulators', 'playstation-emulators'];
+  const isEmulatorEntry = emulatorCategories.includes(game.category);
+  if (isEmulatorEntry) {
+    game.detailsLoaded = true;
+    if (state.activeView === 'details') showGameDetails(game);
+    return;
+  }
+
+  const apiKey = (RAWG_CREDENTIALS.apiKey || '').trim();
+  if (!apiKey || apiKey === 'TU_RAWG_API_KEY') return;
+
+  try {
+    if (!game.rawgId) {
+      const variant = getRawgSearchVariants(game.name)[0];
+      const searchResponse = await fetch(`https://api.rawg.io/api/games?key=${encodeURIComponent(apiKey)}&search=${encodeURIComponent(variant)}&page_size=1`, { cache: 'no-store' });
+      if (!searchResponse.ok) return;
+      const searchData = await searchResponse.json();
+      game.rawgId = searchData.results?.[0]?.id || 0;
+      if (!game.rawgId) return;
+    }
+
+    const response = await fetch(`https://api.rawg.io/api/games/${encodeURIComponent(game.rawgId)}?key=${encodeURIComponent(apiKey)}`, { cache: 'no-store' });
+    if (!response.ok) return;
+
+    const details = await response.json();
+    game.description = details.description_raw || game.description || '';
+    game.descriptionEs = await translateDescriptionToSpanish(game.description);
+    game.genres = Array.isArray(details.genres) ? details.genres.map((item) => item.name).filter(Boolean) : game.genres || [];
+    game.developers = Array.isArray(details.developers) ? details.developers.map((item) => item.name).filter(Boolean) : game.developers || [];
+    game.platforms = Array.isArray(details.platforms) ? details.platforms.map((item) => item.platform?.name).filter(Boolean) : game.platforms || [];
+    game.released = details.released || game.released || '';
+    game.background = details.background_image_additional || details.background_image || game.background || '';
+    game.screenshots = Array.isArray(details.short_screenshots)
+      ? details.short_screenshots.map((item) => item.image).filter(Boolean)
+      : Array.isArray(details.screenshots) ? details.screenshots.map((item) => item.image).filter(Boolean) : game.screenshots || [];
+
+    if (!game.screenshots.length) {
+      const screenshotsResponse = await fetch(`https://api.rawg.io/api/games/${encodeURIComponent(game.rawgId)}/screenshots?key=${encodeURIComponent(apiKey)}&page_size=6`, { cache: 'no-store' });
+      if (screenshotsResponse.ok) {
+        const screenshotsData = await screenshotsResponse.json();
+        game.screenshots = Array.isArray(screenshotsData.results)
+          ? screenshotsData.results.map((item) => item.image).filter(Boolean)
+          : [];
+      }
+    }
+
+    game.detailsLoaded = true;
+    if (state.activeView === 'details') showGameDetails(game);
+  } catch {
+    // La ficha inicial sigue disponible aunque RAWG no responda.
+  }
+};
+
 const showGameDetails = (game) => {
   if (!detailsContent || !game) return;
 
+  const isEdenEmulator = game.category === 'emulators' && normalizeGameName(game.name) === 'eden';
+  const isPhoneEmulator = game.category === 'phone-emulators';
+  const isPlatformEmulator = ['xbox-emulators', 'playstation-emulators'].includes(game.category);
+  const background = isEdenEmulator
+    ? 'https://eden-emu.dev/assets/logos/named_logo.png'
+    : (game.background || game.cover || buildGeneratedCoverDataUrl(game.name));
+  const screenshots = Array.isArray(game.screenshots) ? game.screenshots.filter(Boolean).slice(0, 6) : [];
+  const genres = Array.isArray(game.genres) && game.genres.length ? game.genres.join(', ') : (isEdenEmulator ? 'Emulador, Nintendo' : isPhoneEmulator ? 'Emulador, Android' : isPlatformEmulator ? 'Emulador' : 'Sin géneros registrados');
+  const developers = Array.isArray(game.developers) && game.developers.length ? game.developers.join(', ') : (isEdenEmulator ? 'Eden Emulators' : isPhoneEmulator ? game.name : isPlatformEmulator ? game.name : 'Sin desarrollador registrado');
+  const platforms = Array.isArray(game.platforms) && game.platforms.length ? game.platforms.join(', ') : (isEdenEmulator ? 'PC, macOS, Linux, Web' : isPhoneEmulator ? 'Android' : isPlatformEmulator ? (game.category === 'xbox-emulators' ? 'Xbox' : 'PlayStation') : 'Sin plataformas registradas');
+  const descriptionText = isPhoneEmulator
+    ? (game.descriptionEs || game.description || `${game.name} es un emulador móvil para ejecutar juegos y apps Android con buena compatibilidad, rendimiento y facilidad de uso.`)
+    : (isPlatformEmulator
+      ? (game.descriptionEs || game.description || `${game.name} es un emulador compatible con ${game.category === 'xbox-emulators' ? 'Xbox' : 'PlayStation'} para ejecutar juegos de esa plataforma.`)
+      : (isEdenEmulator
+      ? 'Emulador Nintendo para PC, macOS, Linux y Web con soporte para software, firmware y compatibilidad avanzada.'
+      : (game.descriptionEs || game.description || (game.updated ? 'Tiene una actualización registrada por la fuente.' : 'Disponible en el catálogo de NEXORT.'))));
+
   detailsContent.innerHTML = `
-    <span class="eyebrow">JUEGO</span>
-    <h2>${game.name}</h2>
-    <p>${game.updated ? 'Tiene una actualización registrada por la fuente.' : 'Disponible en el catálogo de NEXORT.'}</p>
-    <div class="source-controls">
-      <button class="primary-button detail-library-toggle" type="button" data-game="${game.name}">${state.library.has(game.name) ? 'Quitar de biblioteca' : 'Agregar a biblioteca'}</button>
-      <button class="secondary-button detail-favorite-toggle" type="button" data-game="${game.name}">${state.favorites.has(game.name) ? 'Quitar favorito' : 'Agregar a favoritos'}</button>
+    <div class="game-detail-hero" style="background-image: linear-gradient(90deg, rgba(5, 9, 16, 0.94) 0%, rgba(5, 9, 16, 0.68) 48%, rgba(5, 9, 16, 0.18) 100%), url('${escapeHtml(background)}')">
+      <div class="game-detail-hero-content">
+        <span class="eyebrow">JUEGO</span>
+        <h2>${escapeHtml(game.name)}</h2>
+        <p>${escapeHtml(descriptionText)}</p>
+        <div class="source-controls">
+          <button class="primary-button detail-library-toggle" type="button" data-game="${escapeHtml(game.name)}">${state.library.has(game.name) ? 'Quitar de biblioteca' : 'Agregar a biblioteca'}</button>
+          <button class="secondary-button detail-favorite-toggle" type="button" data-game="${escapeHtml(game.name)}">${state.favorites.has(game.name) ? 'Quitar favorito' : 'Agregar a favoritos'}</button>
+        </div>
+      </div>
     </div>
+    <div class="game-detail-meta">
+      <div><span>Géneros</span><strong>${escapeHtml(genres)}</strong></div>
+      <div><span>Desarrolladores</span><strong>${escapeHtml(developers)}</strong></div>
+      <div><span>Plataformas</span><strong>${escapeHtml(platforms)}</strong></div>
+      <div><span>Fecha de lanzamiento</span><strong>${escapeHtml(formatReleaseDate(isEdenEmulator ? '2022-03-11' : (isPhoneEmulator ? '2024-01-01' : game.released)))}</strong></div>
+    </div>
+    ${screenshots.length ? `
+      <section class="game-screenshots">
+        <div class="detail-section-heading"><span class="eyebrow">GALERÍA</span><span>${screenshots.length} capturas</span></div>
+        <div class="screenshot-grid">
+          ${screenshots.map((image, index) => `<img src="${escapeHtml(image)}" alt="Captura ${index + 1} de ${escapeHtml(game.name)}" loading="lazy">`).join('')}
+        </div>
+      </section>
+    ` : ''}
+    ${game.url ? `<a class="secondary-button detail-source-link" href="${escapeHtml(game.url)}" target="_blank" rel="noopener noreferrer">Abrir enlace de descarga</a>` : ''}
   `;
+
+  void fetchRawgDetails(game);
+};
+
+const loadGameDetails = async (game) => {
+  showGameDetails(game);
+  openView('details');
 };
 
 const loadGameCovers = async () => {
@@ -1035,6 +1808,7 @@ const loadGameCovers = async () => {
   renderGameCatalog('gameCatalogLibrary', getLibraryGames());
   renderGameCatalog('gameCatalogUpdates', games.filter((game) => game.updated));
   renderFavoritesCatalog();
+  renderPlatformCatalog();
 };
 
 const clearDemoData = () => {
@@ -1060,6 +1834,7 @@ const openView = (viewName) => {
     updateCatalogEmptyStates();
   }
   if (viewName === 'favorites') renderFavoritesCatalog();
+  if (viewName === 'platforms') renderPlatformCatalog();
 
   navItems.forEach((item) => {
     item.classList.toggle('active', item.dataset.view === viewName);
@@ -1263,6 +2038,14 @@ libraryFilter?.addEventListener('change', () => {
   updateCatalogEmptyStates();
 });
 
+document.querySelectorAll('.platform-filter').forEach((button) => {
+  button.addEventListener('click', () => {
+    state.activePlatform = button.dataset.platform || 'all';
+    document.querySelectorAll('.platform-filter').forEach((item) => item.classList.toggle('active', item === button));
+    renderPlatformCatalog();
+  });
+});
+
 document.querySelectorAll('.filter-toggle').forEach((button) => {
   button.addEventListener('click', () => {
     button.classList.toggle('active');
@@ -1395,3 +2178,4 @@ document.addEventListener('click', (event) => {
 
 clearDemoData();
 loadGamesFromApi();
+loadPlatformLists();
