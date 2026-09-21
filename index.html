@@ -25,7 +25,7 @@
         </div>
 
         <nav class="nav" aria-label="Principal">
-          <button class="nav-item active" data-view="home">
+          <button class="nav-item active" data-view="home" aria-current="page">
             <span class="nav-icon">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1v-9.5Z"/></svg>
             </span>
@@ -84,11 +84,28 @@
               <span class="dot"></span>
               Online
             </div>
-            <button class="ghost-button" id="toggleSidebar">Minimizar</button>
+            <button class="ghost-button" id="toggleSidebar" type="button" aria-expanded="true" aria-controls="sidebar">Minimizar</button>
           </div>
         </header>
 
-        <section class="view-panel active" data-view="home">
+        <section class="view-panel active" data-view="home" aria-labelledby="homeTitle">
+          <div class="explore-toolbar" role="group" aria-label="Filtros de inicio">
+            <label for="genreFilter">Categoría</label>
+            <select id="genreFilter">
+              <option value="all">Todas las categorías</option>
+            </select>
+          </div>
+          <div class="home-summary" id="homeSummary">
+            <div class="section-heading">
+              <div>
+                <span class="eyebrow">CENTRO DE CONTROL</span>
+                <h1 id="homeTitle">Tu biblioteca, de un vistazo</h1>
+              </div>
+              <span class="sync-status" id="catalogStatus" role="status">Cargando catálogo...</span>
+            </div>
+            <div class="summary-grid" id="summaryGrid" aria-live="polite"></div>
+            <div class="recent-strip" id="recentStrip"></div>
+          </div>
           <div class="catalog-list" id="gameCatalog"></div>
         </section>
 
@@ -102,11 +119,11 @@
 
         <section class="view-panel" data-view="platforms">
           <div class="platform-toolbar" role="group" aria-label="Filtrar por plataforma">
-            <button class="platform-filter active" type="button" data-platform="PC">PC</button>
-            <button class="platform-filter" type="button" data-platform="Nintendo">Nintendo</button>
-            <button class="platform-filter" type="button" data-platform="Telefono">Teléfono</button>
-            <button class="platform-filter" type="button" data-platform="Xbox">Xbox</button>
-            <button class="platform-filter" type="button" data-platform="PlayStation">PlayStation</button>
+            <button class="platform-filter active" type="button" data-platform="PC" aria-pressed="true">PC</button>
+            <button class="platform-filter" type="button" data-platform="Nintendo" aria-pressed="false">Nintendo</button>
+            <button class="platform-filter" type="button" data-platform="Telefono" aria-pressed="false">Teléfono</button>
+            <button class="platform-filter" type="button" data-platform="Xbox" aria-pressed="false">Xbox</button>
+            <button class="platform-filter" type="button" data-platform="PlayStation" aria-pressed="false">PlayStation</button>
           </div>
           <h2 class="platform-section-title" id="platformCatalogTitle">Juegos</h2>
           <div class="catalog-list" id="gameCatalogPlatforms"></div>
@@ -142,15 +159,28 @@
 
         <section class="view-panel" data-view="profile">
           <div class="source-panel profile-panel">
-            <span class="eyebrow">PERFIL</span>
-            <h2 id="profileHeading">Tu perfil</h2>
-            <label for="profileName">Nombre visible</label>
-            <div class="source-controls">
-              <input id="profileName" type="text" placeholder="Escribe tu nombre" />
-              <button class="primary-button" id="saveProfile" type="button">Guardar perfil</button>
+            <div class="profile-identity">
+              <button class="profile-avatar" id="profileAvatar" type="button" aria-label="Cambiar imagen de perfil">
+                <span id="profileAvatarInitial">N</span>
+                <span class="profile-avatar-edit" aria-hidden="true">+</span>
+              </button>
+              <input id="profileAvatarInput" type="file" accept="image/png,image/jpeg,image/webp" hidden />
+              <div>
+                <span class="eyebrow">PERFIL</span>
+                <h2 id="profileHeading">Tu perfil</h2>
+                <p id="profileActivity">Aún no has guardado cambios.</p>
+              </div>
             </div>
-            <small id="profileStatus">Tu perfil se guarda en este navegador.</small>
+            <form class="profile-form" id="profileForm">
+              <label for="profileName">Nombre visible</label>
+              <div class="source-controls">
+                <input id="profileName" type="text" maxlength="24" minlength="2" autocomplete="nickname" placeholder="Escribe tu nombre" aria-describedby="profileStatus" required />
+                <button class="primary-button" id="saveProfile" type="submit">Guardar perfil</button>
+              </div>
+            </form>
+            <small id="profileStatus" role="status" aria-live="polite">Tu perfil se guarda en este navegador.</small>
             <div class="profile-stats" id="profileStats"></div>
+            <button class="danger-button" id="clearProfileData" type="button">Borrar datos locales</button>
           </div>
         </section>
 
@@ -161,6 +191,7 @@
             <p>Marca juegos como favoritos para guardarlos aquí.</p>
           </div>
         </section>
+
 
         <section class="view-panel" data-view="updates">
           <div class="catalog-list" id="gameCatalogUpdates"></div>
@@ -174,6 +205,7 @@
 
     <div class="toast-stack" id="toastStack" aria-live="polite"></div>
 
+    <script src="state.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

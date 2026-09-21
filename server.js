@@ -133,6 +133,73 @@ app.get('/api/games', async (req, res) => {
   }
 });
 
+app.get('/api/discover', async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit) || 8, 1), 20);
+
+  if (!apiConfig.rawgApiKey) {
+    return res.json({ games: [], warning: 'Falta RAWG_API_KEY para cargar novedades.' });
+  }
+
+  try {
+    const today = new Date();
+    const sixMonthsFromNow = new Date(today);
+    sixMonthsFromNow.setMonth(sixMonthsFromNow.getMonth() + 6);
+    const isTrendsMode = String(req.query.mode || '') === 'trends';
+    const fetchGames = async (ordering, startDate, endDate, pageSize) => {
+      const rawgUrl = new URL('https://api.rawg.io/api/games');
+      rawgUrl.searchParams.set('key', apiConfig.rawgApiKey);
+      rawgUrl.searchParams.set('page_size', String(pageSize));
+      rawgUrl.searchParams.set('ordering', ordering);
+      rawgUrl.searchParams.set('dates', `${startDate.toISOString().slice(0, 10)},${endDate.toISOString().slice(0, 10)}`);
+      const rawgResponse = await fetch(rawgUrl.toString());
+      if (!rawgResponse.ok) throw new Error(`Error consultando juegos: ${rawgResponse.status}`);
+      const rawgData = await rawgResponse.json();
+      return rawgData.results || [];
+    };
+    const upcomingGames = await fetchGames('released', today, sixMonthsFromNow, isTrendsMode ? Math.ceil(limit / 2) : limit);
+    const popularStart = new Date(today);
+    popularStart.setFullYear(popularStart.getFullYear() - 5);
+    const popularGames = isTrendsMode
+      ? await fetchGames('-rating', popularStart, sixMonthsFromNow, Math.floor(limit / 2))
+      : [];
+    const games = [...new Map([...upcomingGames, ...popularGames].map((game) => [game.id, game])).values()]
+      .slice(0, limit)
+      .map((game) => ({
+      id: game.id,
+      name: game.name,
+      background_image: game.background_image || '',
+      background_image_additional: game.background_image_additional || '',
+      released: game.released || '',
+      rating: Number(game.rating) || 0,
+      ratings_count: Number(game.ratings_count) || 0,
+      genres: Array.isArray(game.genres) ? game.genres.map((genre) => genre.name).filter(Boolean) : [],
+      platforms: Array.isArray(game.platforms) ? game.platforms.map((item) => item.platform?.name).filter(Boolean) : [],
+      source: 'rawg',
+      }));
+
+    const gamesWithVideos = await Promise.all(games.map(async (game) => {
+      try {
+        const moviesUrl = new URL(`https://api.rawg.io/api/games/${game.id}/movies`);
+        moviesUrl.searchParams.set('key', apiConfig.rawgApiKey);
+        const moviesResponse = await fetch(moviesUrl.toString());
+        if (!moviesResponse.ok) return game;
+        const moviesData = await moviesResponse.json();
+        const movie = moviesData.results?.[0];
+        return movie?.data?.max || movie?.data?.['480']
+          ? { ...game, video: movie.data.max || movie.data['480'], videoPreview: movie.preview || '' }
+          : game;
+      } catch {
+        return game;
+      }
+    }));
+
+    return res.json({ games: gamesWithVideos });
+  } catch (error) {
+    console.error('Error en /api/discover:', error);
+    return res.status(502).json({ games: [], error: 'No se pudieron cargar las novedades.' });
+  }
+});
+
 if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`NEXORT API running on http://127.0.0.1:${PORT}`);
